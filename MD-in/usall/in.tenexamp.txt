@@ -1,0 +1,106 @@
+# 轴对称拉伸模拟，应变率参考10.1016/j.actamat.2018.03.055，提及1E7-1E9应变率差别不大（4%差异）
+#---------------------- Initialization ---------------------
+units metal
+dimension 3
+boundary p p p
+atom_style atomic
+neighbor  2.0 bin
+neigh_modify delay 5 check yes
+variable   temper equal 300
+variable    tensile_velocity equal 0.005 #端部运动速度
+variable   prerelax_step equal 10000
+variable   tensile_step equal 4000000
+#-------------------- modelling and setting -------------------------
+variable  latconst  equal 3.52
+variable  sizex  equal  10*${latconst}
+variable  sizeyhalf equal 20*${latconst}
+variable  sizez  equal  10*${latconst}
+region  box  block  0   ${sizex}  -${sizeyhalf}  ${sizeyhalf}  0  ${sizez}  units  box
+create_box  1  box
+lattice  fcc ${latconst}
+create_atoms  1  region  box
+variable bot_layer equal -9*${sizeyhalf}/10   #定义下端固定层厚度
+variable top_layer equal 9*${sizeyhalf}/10    #定义上端移动层厚度
+region bot block INF INF INF ${bot_layer} INF INF units box   #划分下端固定层区域
+region top block INF INF ${top_layer} INF INF INF units box   #划分上端移动层区域
+group bot region bot   #将下端固定层原子划为一组
+group top region top   #将上端移动层原子划为一组
+group boundary union bot top  #将上下端原子华为边界组
+group mobile subtract all boundary  #去除边界组部分即为自由运动原子
+#--------------------- Interatomic potential -----------------------
+pair_style  eam/alloy
+pair_coeff  *  * Ni99.eam.alloy Ni
+#---------------------------- Setting ---------------------------
+compute new3d mobile temp  # 考虑原子X Y Z方向的速度，计算出来的温度
+compute new2d mobile temp/partial 1 0 1 #不考虑原子Y方向的速度，计算出来的温度
+compute  peratom  all stress/atom  thermo_temp
+#compute  perpe  all  pe/atom
+#compute  perke  all  ke/atom
+compute  csym   all  centro/atom  fcc
+
+min_style  cg
+minimize  1e-18  1e-18  10000 10000
+
+#---------------------------- Equilibration --------------------------
+reset_timestep 0
+timestep 0.001
+thermo 100
+thermo_style custom step temp pe pxx pyy pzz pxy pxz pyz
+
+dump result1 all custom 10000 dump.equil.*.lammpstrj id type x y z c_csym c_peratom[1] c_peratom[2] c_peratom[3] c_peratom[4] c_peratom[5] c_peratom[6]
+
+###驰豫阶段，上下端原子的受力和速度保持为零，不参与驰豫
+fix fixedtop top setforce 0.0 0.0 0.0
+velocity top set 0.0 0.0 0.0
+fix fixedbot bot setforce 0.0 0.0 0.0
+velocity bot set 0.0 0.0 0.0
+
+velocity  mobile create ${temper} 233333 mom yes rot no
+fix 1 all nve 
+fix 2 mobile temp/rescale 100 ${temper} ${temper} 10 1.0
+fix_modify 2 temp new2d      #采用变形层的温度new2d作为控温标准，可以忽略拉伸产生的额外的质心速度
+
+run  ${prerelax_step}
+write_restart  tensile_Relax.*.restart
+write_data  tensile_Relax.*.data
+
+#unfix 1
+undump  result1
+
+###Store final cell length for strain calculation
+variable tmpy equal ly
+variable L0 equal ${tmpy}
+print  "Initial length, L0 = ${L0}"
+
+#--------------------------- Deformation -------------------------
+change_box all boundary p s p            #使用velocity方法进行拉伸模拟时需要上下端非周期边界
+
+reset_timestep 0
+
+### In units metal, pressure is in [bars]; p2, p3, p4 are in GPa
+variable      deltaL  equal  (ly-${L0})
+variable      p1  equal  v_deltaL
+variable      p2  equal  -pxx/10000
+variable      p3  equal  -pyy/10000
+variable      p4  equal  -pzz/10000
+variable      strainy equal v_deltaL/${L0}
+fix def1 all print 100 "${strainy} ${p3}" file Tensile_data.txt screen no
+
+###display thermo message
+thermo 100
+thermo_modify  temp new2d 
+thermo_style custom step temp pe press v_strainy v_p2 v_p3 v_p4
+
+dump 1 all custom 10000 dump_tensile.*lammps id type x y z c_csym & 
+c_peratom[1] c_peratom[2] c_peratom[3] c_peratom[4] c_peratom[5] c_peratom[6]
+
+### 令上端原子以恒定速度位移，velocity top命令将覆盖之前设置的velocity top命令，不再是0 0 0
+velocity top set 0.0 ${tensile_velocity} 0.0
+velocity mobile ramp vy 0 ${tensile_velocity} y ${bot_layer} ${top_layer} sum yes 
+
+run ${tensile_step}
+
+write_restart  tensile_Relax.*.restart
+write_data  tensile_Relax.*.data
+
+print "-------------- current strain = ${strainy}-----------------"

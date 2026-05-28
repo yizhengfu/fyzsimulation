@@ -1,0 +1,209 @@
+variable filename     index  relax_slab_EquNVT   #data文件名称
+variable vTemp        equal  300
+variable vBradius     equal  5        #弹丸的半径
+variable vdBz         equal  100      #弹丸的高度
+variable vStep        equal  50 	  #输出产物文件步数  
+variable vThermostep  equal  200
+variable vFrestep     equal  200      #Dump1步长
+#variable vImpstep    equal  5        #冲击时间
+variable timestep     equal  0.1
+#==========================   loop Speed  =============================
+label            loopSpe
+variable         vSpeed index  5 10 15 20 25 30 35 40 45 50 55 60         #单位km/s
+variable         vSpe equal  ${vSpeed}/100     #单位:A/fs=10^2km/s
+#==========================   loop Ang    =============================
+label            loopAng
+variable         vAng index 0  
+#==========================    Initial    =============================
+shell mkdir ${vTemp}K${vSpeed}ms${vAng}D
+shell cd    ${vTemp}K${vSpeed}ms${vAng}D
+#=========================== 模拟基本参数 ==============================
+clear
+log              log.impact.txt
+units            real
+boundary         p p p 
+dimension        3 
+atom_style       charge   #charge 改成full
+#===========================neighbour
+neighbor         2.5 bin
+neigh_modify     every 10 delay 0 check no
+#===========================read data
+read_data        ../${filename}.data group Slab  #data文件中原子种类+1
+#read_restart     ../one_gra300KEquNVT.restar 
+#===========================reff
+pair_style       reax/c NULL 
+pair_coeff 		 * * ../S09270256.txt  C S O N H H N N O C C C C O H C C C
+fix   			 q all qeq/reax 1 0.0 10.0 1e-6 reax/c  
+fix              species all reax/c/species 1 1 ${vStep} species.out element C S O N H H N N O C C C C O H C C C #每隔1步采样一次键级，采样100次，并在20000步的时候输出平均键级                
+#===========================bullet
+#===========================非常重要，注意atom数目，需要修改
+#===========================非常重要，注意atom数目，需要修改
+#===========================非常重要，注意atom数目，需要修改
+variable         vdxlo equal xlo 
+variable         vdxhi equal xhi
+variable         vdylo equal ylo 
+variable         vdyhi equal yhi
+variable         vdzlo equal zlo 
+variable         vdzhi equal zhi
+variable         vdxcn equal (${vdxhi}-${vdxlo})/2
+variable         vdycn equal (${vdyhi}-${vdylo})/2 
+lattice          diamond 3.567   #弹丸模型，晶格常数3.567
+region           mobile sphere ${vdxcn} ${vdycn} ${vdBz} ${vBradius} units box #区域名称mobile 球形区域 球心坐标xyz 球半径5 单位与box相同
+create_atoms     18 region mobile
+group            Bullet region mobile
+write_data		 gratop.data
+#===========================group
+group 			 Gra type 16
+group            DGEBA type  1 2 3 4 5 6 7 8 9 10 11 12 13 14 15 
+group            BuandGra union Bullet Gra
+group            BuandDGE union Bullet DGEBA
+#============================================================================
+timestep         ${timestep}  #0.1fs
+#=========================== 定义模型边界并分组 ============================
+variable         vsxhi equal bound(Slab,xmax)
+variable         vsxlo equal bound(Slab,xmin)
+variable         vsyhi equal bound(Slab,ymax)
+variable         vsylo equal bound(Slab,ymin)
+variable         vszlo equal bound(Slab,zmin)
+variable         vszhi equal bound(Slab,zmax)
+variable         xmlo equal ${vsxlo}+4  #核对位置
+variable         xmhi equal ${vsxhi}-4  #核对位置
+variable         ymlo equal ${vsylo}+4  #核对位置                                   
+variable         ymhi equal ${vsyhi}-4  #核对位置
+region           Mov  block ${xmlo} ${xmhi} ${ymlo} ${ymhi} ${vszlo} ${vszhi} units box
+group            Mov  region Mov 
+group            Edge subtract Slab Mov
+reset_timestep   0
+#==================================  能量 =========================================									 									
+compute myke all ke/atom
+compute Gra Gra reduce sum c_myke
+compute DGE DGEBA reduce sum c_myke
+compute Bul Bullet reduce sum c_myke
+thermo  ${vFrestep}
+thermo_style custom step temp ke pe press c_Bul c_Gra c_DGE#弹丸Z方向的温度分布
+#thermo_modify temp new62d
+#############----------------Dump
+dump 			 1 all custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_ALL.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	          #轨迹文件输出		 
+dump 			 2 Gra custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_Graphene.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump 			 3 DGEBA custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_DGEBA.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	      #轨迹文件输出		 
+dump 			 4 Bullet custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_Bullet.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	      #轨迹文件输出
+dump 			 5 BuandGra custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_BuandGra.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump 			 6 BuandDGE custom ${vFrestep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_BuandDGE.lammpstrj id type x y z c_myke xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump             7 all custom ${vFrestep} dump.lammpstrj id type xs ys zs ix iy iz element mass	  #慕然分子模拟dump固定输出格式
+dump_modify 	 1 sort id element  C S O N H H N N O C C C C O H C C C 
+dump_modify 	 2 sort id element  C S O N H H N N O C C C C O H C C C  
+dump_modify 	 3 sort id element  C S O N H H N N O C C C C O H C C C 
+dump_modify 	 4 sort id element  C S O N H H N N O C C C C O H C C C 
+dump_modify 	 5 sort id element  C S O N H H N N O C C C C O H C C C 
+dump_modify 	 6 sort id element  C S O N H H N N O C C C C O H C C C 
+dump_modify 	 7 sort id element  C S O N H H N N O C C C C O H C C C 
+#===========================        冲击模拟      =================================
+variable         speedx equal ${vSpe}*sin(${vAng})
+variable         speedz equal ${vSpe}*cos(${vAng})
+variable         spinx  equal 1*sin(${vAng})
+variable         spinz  equal 1*cos(${vAng})
+#===========================
+variable         Bulletcz    equal xcm(Bullet,z)                         #弹丸z轴方向中心的坐标
+variable         Slabhigh    equal bound(Slab,zmax)  
+variable         Bulletshift equal ${Bulletcz}-${Slabhigh}-2*${vBradius}   #注意弹丸的半径是多少？
+variable         vImpstep1   equal floor(${Bulletshift}/${speedz}/10)*10/${timestep} 
+#displace_atoms   Bullet      move  0 0 -${Bulletshift} units box         #使球直接移到到基体上边缘
+#===========================        
+variable         vzlength equal ${vszhi}-${vszlo}+2*${vBradius}
+variable         vImpstep2 equal  floor(${vzlength}/${speedz}/10)*10/${timestep} 
+fix              FsetEdge Edge setforce 0.0 0.0 0.0         #设置边界压力为0
+velocity         Edge set 0.0 0.0 0.0 sum no units box      #设置边界速度为0
+fix              Fsetrigid Bullet  rigid single
+fix	             1 Slab  nve                                #nve
+velocity         Bullet  set  ${speedx} 0.0 -${speedz} sum no units box      #A/fs=10^5m/s 文献里是1km/s~5km/s=0.01~0.05A/fs
+run              ${vImpstep1}
+#reset_timestep   0
+#===========================  bonds ============================
+fix              1bonds DGEBA reax/c/bonds ${vStep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_DGEBAbonds.reax
+fix              2bonds Gra reax/c/bonds ${vStep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_Grabonds.reax   
+fix              3bonds Bullet reax/c/bonds ${vStep} ${filename}${vTemp}K${vSpeed}ms${vAng}D_Bulletbonds.reax 
+#===========================  stress/atom应力计算  ============================
+compute          sBullet Bullet stress/atom  NULL 
+compute          strea  Bullet reduce sum c_sBullet[1]                 #弹丸区域内的全部原子的应力和，X方向
+compute          streb  Bullet reduce sum c_sBullet[2]                 #弹丸区域内的全部原子的应力和，Y方向
+compute          strec  Bullet reduce sum c_sBullet[3]                 #弹丸区域内的全部原子的应力和，Z方向
+variable         sxx    equal -c_strea/(8.784*count(Bullet))*1.01325*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，X方向
+variable         syy    equal -c_streb/(8.784*count(Bullet))*1.01325*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，Y方向
+variable         szz    equal -c_strec/(8.784*count(Bullet))*1.01325*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，Z方向
+fix              force  Bullet ave/time 1 1 ${vFrestep} v_sxx v_syy v_szz ave one file ${filename}${vTemp}K${vSpeed}ms${vAng}BulletStress.txt
+#===========================  弹丸受力计算  ============================新加的
+compute			 fx0 Bullet reduce sum fx
+compute			 fy0 Bullet reduce sum fy
+compute			 fz0 Bullet reduce sum fz  #弹丸在z方向上受到的力，即阻力
+variable 		 fxx equal c_fx0
+variable 		 fyy equal c_fy0
+variable 		 fzz equal c_fz0
+fix              resis all print ${vFrestep} "${fxx} ${fyy} ${fzz}" file resistance.txt
+#===========================     Temp 温度计算    ================================
+#=================================================================================
+variable         vdbelowxhi equal bound(Bullet,xmax)
+variable         vdbelowxlo equal bound(Bullet,xmin)
+variable         vdbelowyhi equal bound(Bullet,ymax)
+variable         vdbelowylo equal bound(Bullet,ymin)
+variable         vdbelowzhi equal bound(DGEBA,zmax)
+variable         vdbelowzlo equal bound(DGEBA,zmin)
+region           below  block ${vdbelowxlo} ${vdbelowxhi} ${vdbelowylo} ${vdbelowyhi} ${vdbelowzlo} ${vdbelowzhi} units box
+group            below  region below
+#=================================================================================
+compute          cc3      Bullet chunk/atom bin/1d z lower 0.01 units reduced  #弹丸Z方向的温度分布
+compute          myChunk3 Bullet temp/chunk cc3 temp
+compute          new3d    Bullet temp/partial 1 1 0
+compute          cc5 Gra chunk/atom bin/1d z lower 0.01 units reduced #molecule    #石墨烯Z方向的温度分布 新加的
+compute          myChunk5 Gra temp/chunk cc5 temp com yes
+fix              temp5 Gra ave/time 1 1 ${vFrestep} c_myChunk5[1] file tmp_GRA.out mode vector
+compute          cc4 Mov chunk/atom bin/1d z lower 0.01 units reduced #molecule未固定片层的温度分布
+compute          myChunk4 Mov temp/chunk cc4 temp com yes
+fix              temp4 Mov ave/time 1 1 ${vFrestep} c_myChunk4[1] file tmp.out mode vector
+compute          cc6 below chunk/atom bin/1d z lower 0.01 units reduced #撞击点正下方的温度分布
+compute          myChunk6 below temp/chunk cc6 temp com yes
+fix              temp6 below ave/time 1 1 ${vFrestep} c_myChunk6[1] file tmp_below1.out mode vector
+compute          cc62      below chunk/atom bin/1d z lower 0.01 units reduced  #撞击点正下方的温度分布
+compute          myChunk62 below temp/chunk cc62 temp
+compute          new62d    below temp/partial 1 1 0
+#===========================      撞击点正下方的压力计算    ================================
+compute			 px0 below reduce sum fx
+compute			 py0 below reduce sum fy
+compute			 pz0 below reduce sum fz  #弹丸在z方向上受到的力，即阻力
+variable 		 pxx equal c_px0
+variable 		 pyy equal c_py0
+variable 		 pzz equal c_pz0
+fix              pressure below print ${vFrestep} "${pxx} ${pyy} ${pzz}" file pressure.txt
+#===========================       密度分布       ================================
+compute          Difmassdensity  Slab  chunk/atom bin/1d x lower 0.01 units reduced                                                #沿Z方向的质量密度分布
+fix              DensitySlab     Slab  ave/chunk 1 1 ${vFrestep} Difmassdensity density/mass file ${filename}${vTemp}K${vSpeed}ms${vAng}D_Slabmassdensity.txt #质量密度分布文件输出
+#==================================  比穿透能 =========================================
+variable  density     equal  0.608440 #目标的密度
+variable  thickness   equal  79.997322 #目标的厚度
+variable  As   equal  PI*25 #目标的厚度
+variable  Ep   equal c_Bul/(${density}*${thickness}*${As})
+#####################################################################################
+##############----------------Displacement
+variable         LocBullzh      equal bound(Bullet,zmax) 
+variable         DistBullz      equal ${LocBullzh}-v_LocBullzh 
+variable         VelocityBullx  equal vcm(Bullet,x)             
+variable         VelocityBully  equal vcm(Bullet,y)             
+variable         VelocityBullz  equal vcm(Bullet,z)                   #弹丸在z轴方向上的速度
+fix              Displacement Bullet ave/time 1 1 ${vFrestep} v_DistBullz v_VelocityBullx v_VelocityBully v_VelocityBullz ave one file ${filename}${vTemp}K${vSpeed}ms${vAng}D_BulletDis.txt
+##############----------------
+run              ${vImpstep2}
+write_data       ${filename}${vTemp}K${vSpeed}ms${vAng}D.data
+write_restart    ${filename}${vTemp}K${vSpeed}ms${vAng}D.restar
+unfix	         1 
+undump           1
+undump           2
+undump           3
+undump           4
+undump           5
+undump           6
+undump           7
+shell            cd ../
+next             vAng
+jump             3-in.imp.txt loopAng
+next             vSpeed
+jump             3-in.imp.txt loopSpe
+print            "Job's done" 

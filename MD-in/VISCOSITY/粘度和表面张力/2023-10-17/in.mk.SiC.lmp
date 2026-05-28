@@ -1,0 +1,227 @@
+# Created on 2023-10-10
+# @author: fuyizheng
+# VARIABLES
+variable fname index SiC.data
+variable vTimestep equal 0.001             #时间步长0.001ps=1fs
+variable vPre equal 1.013           #1bar=0.986atm,1.013bar=1atm
+variable vTemphi equal 10000            #高温弛豫温度
+##############-------------
+variable vEqu1time equal 200000         #500000
+variable vEqu2time equal 300000         #500000
+variable vSurfTime equal 500000
+variable vEqu3time equal 200000
+variable vVisTime  equal 300000
+variable vFrestep  equal 1000
+variable vNrepert1 equal ${vSurfTime}/${vFrestep}
+variable vNrepert2 equal ${vVisTime}/${vFrestep}
+variable Ndump     equal 1000
+##############----------------loop Temperature
+label loopTem
+variable vTemp index 2000 3000 4000 5000 6000 7000 8000 9000 10000#温度
+##############----------------
+shell mkdir ${vTemp}_K
+shell cd ${vTemp}_K
+##############----------------Initial----------------
+log ${vTemp}K.log
+clear
+units metal
+boundary p p p
+dimension 3 
+neighbor 2.0 bin
+#neigh_modify every 1 delay 0 
+neigh_modify every 1 delay 5 check yes 
+#neigh_modify every 1 delay 10 check yes
+atom_style full
+read_data ../${fname}
+#read_restart ../${fname}
+##############----------------Forcefield set
+############# VARIABLE FOR PAIR ################## C,Si,B,Zr
+variable vEpC	  equal 0.00455323 
+variable vSigC    equal 3.851 
+variable vEpSi    equal 0.0174324 
+variable vSigSi   equal 4.295 
+variable vEpZr    equal 0.00299212 
+variable vSigZr   equal 3.124 
+variable vEpB     equal 0.0078055 
+variable vSigB    equal 4.083
+############# VARIABLE FOR PAIR ################## Ti, Nb, Ta与Hf
+variable vEpTi    equal 0.00238503 
+variable vSigTi   equal 4.54
+variable vEpNb    equal 0.00255848 
+variable vSigNb   equal 3.165
+variable vEpTa    equal 0.00351249 
+variable vSigTa   equal 3.17
+variable vEpHf    equal 0.00312222 
+variable vSigHf   equal 3.141
+############## Si C Ti ##################
+variable vEpSiTi  equal (${vEpSi}*${vEpTi})^0.5 
+variable vSigSiTi equal (${vSigSi}+${vSigTi})/2 
+variable vEpCTi   equal (${vEpC}*${vEpTi})^0.5 
+variable vSigCTi  equal (${vSigC}+${vSigTi})/2 
+############## Zr B Ti ##################
+variable vEpZrTi  equal (${vEpZr}*${vEpTi})^0.5 
+variable vSigZrTi equal (${vSigZr}+${vSigTi})/2 
+variable vEpBTi   equal (${vEpB}*${vEpTi})^0.5 
+variable vSigBTi  equal (${vSigB}+${vSigTi})/2 
+############## Si C Zr B ##################
+variable vEpSiZr  equal (${vEpSi}*${vEpZr})^0.5 
+variable vSigSiZr equal (${vSigSi}+${vSigZr})/2 
+variable vEpSiB   equal (${vEpSi}*${vEpB})^0.5 
+variable vSigSiB  equal (${vSigSi}+${vSigB})/2 
+variable vEpCZr   equal (${vEpC}*${vEpZr})^0.5 
+variable vSigCZr  equal (${vSigC}+${vSigZr})/2 
+variable vEpCB    equal (${vEpC}*${vEpB})^0.5 
+variable vSigCB   equal (${vSigC}+${vSigB})/2 
+############# PAIR COEFF	####
+#pair_style hybrid meam tersoff lj/cut 1.0e
+#pair_style hybrid meam tersoff tersoff lj/cut 1.0e1
+pair_style  tersoff shift 0.05
+pair_coeff  * * ../SiC.tersoff C Si
+#pair_coeff * * meam ../library.meam Hf Nb Ta Ti Zr ../HfNbTaTiZr.meam NULL NULL Ti NULL NULL
+#pair_coeff * * tersoff 1 ../SiC.tersoff C Si NULL NULL NULL 
+#pair_coeff * * tersoff 2 ../ZrB2.tersoff NULL NULL NULL B Zr 
+#pair_coeff 1 3 lj/cut  ${vEpCTi}  ${vSigCTi}  #C Ti 
+#pair_coeff 1 4 lj/cut  ${vEpCB}   ${vSigCB}   #C B
+#pair_coeff 1 5 lj/cut  ${vEpCZr}  ${vSigCZr}  #C Zr
+#pair_coeff 2 3 lj/cut  ${vEpSiTi} ${vSigSiTi} #Si Ti 
+#pair_coeff 2 4 lj/cut  ${vEpSiB}  ${vSigSiB}  #Si B
+#pair_coeff 2 5 lj/cut  ${vEpSiZr} ${vSigSiZr} #Si Zr
+#pair_coeff 3 3 meam  ../HfNbTaTiZr.meam NULL NULL Ti NULL NULL 
+#pair_coeff 3 4 lj/cut  ${vEpBTi}  ${vSigBTi}  #B Ti
+#pair_coeff 3 5 lj/cut  ${vEpZrTi} ${vSigZrTi} #Zr Ti
+#pair_modify  mix arithmetic
+##############----------------MM----------------
+#min_style cg                                       #qwh
+#min_modify dmax 0.4
+minimize 1e-10 1e-10 20000 50000                    #能量最小化
+##############----------------Temper controllers
+compute cTall all temp
+#compute cPress all pressure thermo_temp
+compute cPress all pressure cTall
+compute cEng all pe/atom                            #compute potential energy for each atom
+compute cEatoms all reduce sum c_cEng               #compute total energy for whole system
+##############----------------Timestep
+timestep ${vTimestep}
+reset_timestep 0
+##############----------------Thermo
+#thermo_style custom step temp press pe ke etotal lx ly lz atoms vol c_cEatoms
+thermo_style  custom step temp pe ke etotal density
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo ${vFrestep}
+#####################################################
+# Equilibration Stage 1 (NVT dynamics at vTemphiK)
+##############----------------NVT
+velocity all create ${vTemp} 5812775 dist gaussian loop geom
+fix 1 all nvt temp ${vTemp} ${vTemp} $(100.0*dt) #drag 2
+#fix 1 all nve/limit 0.1 
+#fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+fix_modify 1 temp cTall
+run ${vEqu1time}
+unfix 1
+write_data ${fname}_${vTemp}K.Equ1.data
+write_restart ${fname}_${vTemp}K.Equ1.restart
+# minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+#####################################################
+# Equilibration Stage 2 (NPT dynamics at vTemphi-vTem K)
+##############----------------NPT
+#velocity all create ${vTemhi} 5812775 dist gaussian loop geom
+fix 1 all npt temp ${vTemp} ${vTemp} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+run ${vEqu2time}
+unfix 1
+#unfix 2
+#unfix 3
+write_data ${fname}_${vTemp}K.Equ2.data
+write_restart ${fname}_${vTemp}K.Equ2.restart
+#minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+##############----------------Compute surface tension
+##############----------------NVT
+dump  1 all custom ${Ndump} ${fname}_${vTemp}K.Surfacetrj.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 sort id element C Si Ti B Zr 
+fix 1 all nvt temp ${vTemp} ${vTemp} $(100.0*dt) #drag 2
+#fix 1 all nve/limit 0.1 
+#fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+fix_modify 1 temp cTall
+# Set up pressure tensor components
+# c_thermo_press[1] is the XX component of the pressure tensor
+variable xPress equal c_thermo_press[1] 
+variable yPress equal c_thermo_press[2] 
+variable zPress equal c_thermo_press[3]
+##############----------------convertFac
+variable A_in_m equal 1e-10 # Angstrom in meter
+#variable atm_in_Pa equal 101325 # note: 1 Pa = 1 N/m^2
+variable bars_in_Pa equal 100000 # note: 1 Pa = 1 N/m^2
+variable N_in_mN equal 1e3 # Newton in milliNewton
+variable convFac equal ${A_in_m}*${bars_in_Pa}*${N_in_mN}
+##############----------------surface
+# lz is the box length in the z-dimention
+variable st equal 0.5*lz*(v_zPress-0.5*(v_xPress+v_yPress))*${convFac} # in 
+fix st all ave/time ${vFrestep} 1 ${vFrestep} v_st file ${fname}_${vTemp}K.surfTension.txt #单位N/m
+fix stav all ave/time ${vFrestep} ${vNrepert1} ${vSurfTime} v_st file ${fname}_${vTemp}K.AvsurfTension.txt #单位N/m
+run ${vSurfTime}
+write_data ${fname}_${vTemp}K.Surface.data
+write_restart ${fname}_${vTemp}K.Surface.restart
+write_dump all atom ${fname}_${vTemp}K.Surface.lammpstrj modify scale no sort id
+unfix 1
+unfix st
+unfix stav
+undump 1
+# minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+##############----------------Compute viscosity
+##############----------------convert_eta
+#variable dt equal 0.001 
+variable KB equal 8.625e-5              
+#variable bars2Pa equal 1e5        # 1bar=10^5 Pa  1000bar = 0.1 GPa=10^9 Pa
+variable bars2Pa equal 1e5         # 1bar=10^5 Pa  1000bar = 0.1 GPa=10^9 Pa
+variable A2m equal 1.0e-10         # 1A=10^-10 m
+variable ps2s equal 1.0e-12        # 1ps=10^-12 s
+variable ev2J equal 96438.5/6.02214e23 # 1ev=96 kJ/mol =96438.5 J/6.03e23
+variable g_mol2kg equal 1.0e-3/6.02214e23 #kg
+variable convert_eta equal ${g_mol2kg}/${ps2s}/${A2m} #这一步的作用是什么？单位因子
+#####################################################
+dump 1 all custom ${Ndump} ${fname}_${vTemp}K.viscositytrj.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 sort id element C Si Ti B Zr 
+compute mytemp all temp/partial  0 0 1                 #在排除x、y方向速度分量后计算温度
+fix 1 all nvt temp ${vTemp} ${vTemp} $(100.0*dt)       #drag 2
+fix_modify 1 temp mytemp                               #移除速度分量，本质上是在原子速度的“偏压”被移除后计算温度
+#通过与动量通量成比例的应力张量的非对角分量来测量响应。
+fix MP_v all viscosity 10 x y 20                       #每0.1ps交换一次x方向的动量，动量传递方向是y方向
+compute layers_eta all chunk/atom bin/1d y center 0.05 units reduced      #在y方向分20块
+fix ave_vx all ave/chunk ${vFrestep} 1 ${vFrestep} layers_eta vx file MP_vx.txt          #输出的是x方向速度
+# equilibration run 
+variable  dVx equal (2*f_ave_vx[11][3]-f_ave_vx[1][3]-f_ave_vx[20][3])/2   #速度梯度，（2*中间层11层-最下层1层-最上层20层）/2 取平均值          
+thermo    1000
+thermo_style  custom step temp pe ke etotal f_MP_v v_dVx               
+thermo_modify temp mytemp                                
+run ${vEqu3time}
+unfix    MP_v
+# data gathering run
+fix MP_v all  viscosity 10 x y 20
+variable  eta equal -(f_MP_v/(2*((step-${vEqu3time})*${vTimestep})*lx*lz+1.0e-10))/(v_dVx/(ly/2))*${convert_eta}
+thermo_style  custom step temp pe ke etotal f_MP_v v_dVx v_eta
+thermo_modify temp mytemp
+#取平均值
+fix vis all ave/time ${vFrestep} 1 ${vFrestep} v_eta file ${fname}_${vTemp}K.viscosity.txt #单位Pa.s
+fix visav all ave/time ${vFrestep} ${vNrepert2} ${vSurfTime} v_eta file ${fname}_${vTemp}K.Avviscosity.txt #单位Pa.s
+#fix vave all ave/time 10 100 1000 v_visc ave running start 70000 #start的意思
+#thermo_style custom step temp press pxy v_visc f_vave
+run  ${vVisTime} 
+write_data ${fname}_${vTemp}K.Viscosity.data
+write_restart ${fname}_${vTemp}K.Viscosity.restart
+write_dump all atom ${fname}_${vTemp}K.Viscosity.lammpstrj modify scale no sort id
+unfix MP_v
+unfix 1
+unfix vis 
+unfix visav
+undump 1
+#####################################################
+shell cd ../
+next vTemp
+jump in.mk.SiC.lmp loopTem
+print "All done"

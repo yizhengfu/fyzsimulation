@@ -1,0 +1,75 @@
+#GAP Equilibration
+variable filename    index High_temp_NPT    #层模型文件  
+variable vThermostep equal 1000
+variable vFrestep    equal 1000                 #Dump、Thermo步长
+variable vNVTStep    equal 100000  #100000       #平衡NVT时间
+
+variable vTemphigh   equal 300          #温度
+variable vTemplow    equal 4000
+#variable vPre       equal 2000.0        #压力单位MPa 常压1atm=0.101Mpa 
+#variable vPress     equal ${vPre}*9.87  #压力 1MPa=9.87atm 
+variable vdt         equal 0.1
+variable Density     equal 1.0         #理想密度
+#=========================== 模拟基本参数 ==============================
+shell mkdir yasuo  #创建目录
+shell cd yasuo     #改变工作目录
+log log.yasuo.txt
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+neighbor        2.5 bin
+neigh_modify    every 10 delay 0 check no
+#===============    读取模型文件并分组================
+read_data       ../${filename}.data #group GAP 
+#===========================  势函数设置
+pair_style    reax/c NULL  #势类型
+pair_coeff * *  ../CHO.ff C  #所有的原子，后面的元素和data文件中的mass一一对应
+fix 		q all qeq/reax 1 0.0 10.0 1e-6 reax/c  #电荷平衡
+#fix             bonds all reax/c/bonds 10 bonds.reax   #成键信息  
+#===============Bond 设置 
+#bond_style 	    harmonic
+#===========================loop Energy===========================
+#bond_coeff 	    1 ${vEnergy1} 1.2          #在弛豫的过程中不断减小bond_coeff的能量项逐渐消除约束的强度直到完全消除约束，然后写出data文件
+#special_bonds 	lj/coul 1.0 1.0 1.0
+#=========================== 能量最小化 ============================
+timestep        ${vdt}            
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 初始化 ============================
+velocity all create ${vTemphigh} 7474747 rot yes dist gaussian #设置初始速度 所有的原子 温度300K seed 服从高斯分布
+thermo ${vThermostep} #每100步输出一次
+thermo_style     custom  step pe ke etotal temp lx ly lz press atoms vol
+compute          cTall all temp
+thermo_modify    temp  cTall flush yes lost ignore         #数据实时输出 不保存
+dump 			 1 all custom ${vFrestep} yasuo.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump_modify 	 1 sort id element  C
+#开启循环，判断是继续压缩还是跳出循环
+label           loop
+variable        i loop 100
+variable        tmp equal "density"
+variable        D0 internal ${tmp} 
+variable        tmq equal "density"
+variable        D1 equal ${tmq}
+#variable        Ld equal "(v_L0 - v_L1)"
+thermo_style    custom  step pe ke etotal temp lx ly lz press atoms vol density
+thermo_modify   temp  cTall flush yes lost ignore
+fix              1 all npt temp ${vTemphigh} ${vTemphigh} $(100.0*dt) iso ${vPress} ${vPress} $(1000*dt)
+run 1000
+print           "${D1}"
+if              "${D1} > ${Density}" then "jump ../in-press.txt break" #
+next            i
+jump            ../in-press.txt loop
+label           break
+shell            cd ../
+write_data      press.data									 
+write_restart 	press.restart
+shell cd ${vEnergy1}Kcalmol
+write_data       ${filename}_${vEnergy1}Kcalmol_EquNPT.data		          							 
+write_restart 	 ${filename}_${vEnergy1}Kcalmol_EquNPT.restar
+unfix            1
+undump           1
+#shell            cd ../
+#jump             in-c.txt
+print "All done"

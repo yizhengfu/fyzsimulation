@@ -1,0 +1,65 @@
+# 采用metal单位系统（记住：能量eV；长度：A；时间：ps）
+echo              screen
+units             metal
+dimension           3
+boundary          p p p
+atom_style        full
+
+# 定义几个参数 
+variable    T  equal 100                             # 温度为 100 K
+variable    A  equal 5.4                              # 晶格常数大概为 5.4 A
+variable    DT equal 0.01                           # 积分步长为 10 fs
+
+#读取模型
+read_data Ar4000.data
+
+#力场设置
+pair_style   lj/cut 10.0                               # LJ 势的截断半径取10 A
+pair_coeff   * * 1.032e-2 3.405                # epsilon 和 sigma
+velocity     all create ${T} 12345              # 根据温度初始化速度
+timestep     ${DT}                                     # 设置积分步长
+thermo          1000
+thermo_style	custom step temp pe ke etotal density
+
+#简单弛豫
+fix 1 all npt temp 100 100 1 iso 1 1 10
+run 50000
+
+#粘度计算
+reset_timestep  0
+variable    dt equal 0.01 
+variable   KB equal 8.625e-5        # 玻尔兹曼常数，eV/K
+variable bars2Pa equal 1e5 #压力转换（1bar=1*e5Pa）
+variable A2m equal 1.0e-10 # 1A=1*e-10m
+variable ps2s equal 1.0e-12 # 1ps=e-12s
+variable ev2J equal 96438.5/6.02214e23
+variable g_mol2kg equal 1.0e-3/6.02214e23
+variable    convert_eta equal ${g_mol2kg}/${ps2s}/${A2m} 
+
+compute mytemp all temp/partial  0 0 1                        #在排除x、y方向速度分量后计算温度
+fix fxnvt all nvt temp  100 100 1
+fix_modify fxnvt temp mytemp                                      #移除速度分量，本质上是在原子速度的“偏压”被移除后计算温度
+
+#通过与动量通量成比例的应力张量的非对角分量来测量响应。
+fix MP_v all viscosity 10 x y 20                                   #每0.1ps交换一次x方向的动量，动量传递方向是y方向
+compute layers_eta all chunk/atom bin/1d y center 0.05 units reduced     #在y方向分20块
+fix ave_vx all ave/chunk 20 50 1000 layers_eta vx file MP_vx.txt          #输出的是x方向速度
+
+# equilibration run 
+
+variable	dVx equal (2*f_ave_vx[11][3]-f_ave_vx[1][3]-f_ave_vx[20][3])/2             
+thermo          1000
+thermo_style	custom step temp pe ke etotal f_MP_v v_dVx        # f_MP_v是x方向交换的动量，dVx是x方向平均速度差
+thermo_modify temp mytemp                                                              #修改默认的输出为mytemp
+run		100000
+unfix		MP_v
+# data gathering run
+# reset fix viscosity to zero flux accumulation
+
+fix		MP_v all  viscosity 10 x y 20
+variable	eta equal -(f_MP_v/(2*((step-100000)*${dt})*lx*lz+1.0e-10))/(v_dVx/(ly/2))*${convert_eta}
+
+thermo_style	custom step temp pe ke etotal f_MP_v v_dVx v_eta
+thermo_modify temp mytemp
+
+run	        100000

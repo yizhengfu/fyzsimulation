@@ -1,0 +1,140 @@
+#variable simname     index  All${vTemp}K.EquNVT.restart  #restart文件
+variable vTemp       equal  300
+variable vBradius    equal  5
+variable vThermostep equal  10
+variable vFrestep    equal  10                #Dump1步长
+variable vImpstep    equal  3500              #冲击时间
+#==========================   loop Speed  =============================
+label            loopSpe
+variable         vSpe index -0.60        #单位？
+#==========================   loop Ang    =============================
+label            loopAng
+variable         vAng index 0  
+#==========================    Initial    =============================
+shell            mkdir ${vTemp}K${vSpe}m/s${vAng}D
+shell            cd    ${vTemp}K${vSpe}m/s${vAng}D
+#=========================== 模拟基本参数 ==============================
+clear
+log log.impact.txt
+units            real
+boundary         p p p 
+dimension        3 
+atom_style       charge
+#neighbor        2 nsq
+#neigh_modify    every 1 delay 5  check yes
+neighbor         2.5 bin
+neigh_modify     every 10 delay 0 check no   
+read_restart     ../All${vTemp}K.EquNVT.restart 
+pair_style 		 reax/c  NULL
+pair_coeff 		 * * ../../field.reax-chons  C S O N H C C 
+fix   			 q all qeq/reax 1 0.0 10.0 1e-6 reax/c 
+timestep         0.1               #0.1fs 
+#=========================== Change box
+variable        zLo equal zlo-20
+variable        zhi equal zhi
+change_box      all z final ${zLo} ${zhi} units box
+comm_style      tiled
+#fix fixbalance all balance 1000 1.2 rcb
+fix loadBalance all balance 20 z 5 1.05
+#=========================== 定义模型边界并分组 ============================
+variable         vdzlo equal zlo 
+variable         vdzhi equal zhi 
+variable         xmlo equal xlo+4  #核对位置
+variable         xmhi equal xhi-4  #核对位置
+variable         ymlo equal ylo+4  #核对位置                                   
+variable         ymhi equal yhi-4  #核对位置
+region           Mov  block ${xmlo} ${xmhi} ${ymlo} ${ymhi} ${vdzlo} ${vdzhi} units box
+group            Mov  region Mov 
+group            Edge subtract Slab Mov
+#===========================  stress/atom应力计算  ============================
+compute          sBullet Bullet stress/atom  NULL 
+compute          strea  Bullet reduce sum c_sBullet[1]                 #弹丸区域内的全部原子的应力和，X方向
+compute          streb  Bullet reduce sum c_sBullet[2]                 #弹丸区域内的全部原子的应力和，Y方向
+compute          strec  Bullet reduce sum c_sBullet[3]                 #弹丸区域内的全部原子的应力和，Z方向
+variable         sxx    equal -c_strea/(8.784*count(Bullet))*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，X方向
+variable         syy    equal -c_streb/(8.784*count(Bullet))*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，Y方向
+variable         szz    equal -c_strec/(8.784*count(Bullet))*(10^-4)   #弹丸区域内的全部原子的应力和除以该区域体积，Z方向
+fix              force  Bullet ave/time 1 1 10 v_sxx v_syy v_szz ave one file ${vTemp}K${vSpe}m/s${vAng}D_BulletStress.txt
+#===========================     Temp 温度计算    ================================
+compute          cc1      all  chunk/atom bin/1d z lower 0.01 units reduced   #整个模型Z方向的温度分布
+compute          myChunk  all  temp/chunk cc1 temp
+compute          cc2      Slab chunk/atom bin/1d z lower 0.01 units reduced  #片层Z方向的温度分布
+compute          myChunk2 Slab temp/chunk cc2 temp
+fix              temp     all  ave/chunk 1 1 10 cc1 temp file ${vTemp}K${vSpe}m/s${vAng}D_AllTemp.txt        #整个模型Z方向的温度分布输出
+fix              temp2    Slab ave/chunk 1 1 10 cc2 temp file ${vTemp}K${vSpe}m/s${vAng}D_SlabTemp.txt      #片层Z方向的温度分布输出
+#===========================       密度分布       ================================
+compute          Difmassdensity  Slab  chunk/atom bin/1d z lower 0.01 units reduced                                                #沿Z方向的质量密度分布
+fix              DensitySlab     Slab  ave/chunk 1 1 10 Difmassdensity density/mass file ${vTemp}K${vSpe}m/s${vAng}D_Slabmassdensity.txt #质量密度分布文件输出
+#==================================  能量 =========================================									 									
+variable etotal equal etotal  
+variable epair  equal epair
+variable evdwl  equal evdwl
+variable ecoul  equal ecoul
+variable ebond  equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable eimp   equal eimp
+variable emol   equal emol
+variable elong  equal elong 
+variable etail  equal etail
+variable enthalpy  equal enthalpy  
+fix Energy all ave/time 1 1 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${vTemp}K${vSpe}m/s${vAng}D_Energy.txt
+##############----------------Group/group
+compute cIntDG DGEBA group/group Graphene
+compute cIntDB DGEBA group/group Bullet
+compute cIntGB Graphene group/group Bullet
+fix Intgroup all ave/time 1 1 ${vFrestep} c_cIntDG c_cIntDB c_cIntGB ave one file ${vTemp}K${vSpe}m/s${vAng}D_Interact.txt
+##############----------------Dump
+dump 			 1 all custom ${vFrestep} ${vTemp}K${vSpe}m/s${vAng}D_all.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump 			 2 Graphene custom ${vFrestep} ${vTemp}K${vSpe}m/s${vAng}D_all.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump 			 3 DGEBA custom ${vFrestep} ${vTemp}K${vSpe}m/s${vAng}D_all.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump 			 4 Bullet custom ${vFrestep} ${vTemp}K${vSpe}m/s${vAng}D_all.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出	
+dump             5 all cfg 10 dump.sanp.*.cfg mass type xs ys zs      #输出cfg格式得文件，方便后续导入到MS可视化结果
+dump_modify 	 1 sort id element C S O N H C C
+dump_modify 	 2 sort id element C S O N H C C
+dump_modify 	 3 sort id element C S O N H C C
+dump_modify 	 4 sort id element C S O N H C C 
+dump_modify      5 sort id element C S O N H C C         
+##############----------------Displacement
+variable         Loc_Bull_x      equal xcm(Bullet,x)                  
+variable         Loc_Bull_y      equal xcm(Bullet,y)                  
+variable         Loc_Bull_z      equal xcm(Bullet,z)                   #弹丸在z轴方向上的位置
+variable         Dist_Bull_x     equal ${Loc_Bull_x}-v_Loc_Bull_x 
+variable         Dist_Bull_y     equal ${Loc_Bull_y}-v_Loc_Bull_y
+variable         Dist_Bull_z     equal ${Loc_Bull_z}-v_Loc_Bull_z      #弹丸在z轴方向上的位移：(最初始的位置)定量-变量(弹丸在冲击过程中不断变化的位置)
+variable         Velocity_Bull_x equal vcm(Bullet,x)             
+variable         Velocity_Bull_y equal vcm(Bullet,y)             
+variable         Velocity_Bull_z equal vcm(Bullet,z)                   #弹丸在z轴方向上的速度
+fix              Displacement  all ave/time 1 1 10 v_Dist_Bull_x v_Dist_Bull_y & 
+  v_Dist_Bull_z v_Velocity_Bull_x v_Velocity_Bull_y v_Velocity_Bull_z & 
+  ave one file ${vTemp}K${vSpe}m/s${vAng}D_BulletDis.txt
+#===========================        冲击模拟      =================================
+variable         Bulletcz    equal xcm(Bullet,z)                       #弹丸z轴方向中心的坐标
+variable         DGEBAhigh   equal bound(DGEBA,zmax)                   #环氧聚合物z轴坐标上限
+variable         Bulletshift equal ${Bulletcz}-${DGEBAhigh}-${vBradius}          #注意弹丸的直径是多少？
+displace_atoms   Bullet      move 0 0 -${Bulletshift} units box        #使球直接移到到基体上边缘
+#===========================        
+fix              FsetEdge Edge setforce 0.0 0.0 0.0         #设置边界压力为0
+velocity         Edge set 0.0 0.0 0.0 sum no units box      #设置边界速度为0
+variable         speedx equal ${vSpe}*sin(${vAng})
+variable         speedz equal ${vSpe}*cos(${vAng})
+fix              Fsetrigid Bullet  rigid single		                  #设置金刚石弹丸为刚性
+velocity         Bullet  set 0.0 ${speedx} ${speedz} sum no units box      #A/fs=10^5m/s 文献里是1km/s~5km/s=0.01~0.05A/fs 
+fix	             1 Slab  nve                                #nvt
+fix	             2 Slab  langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+run              ${vImpstep}
+write_data       ${vTemp}K${vSpe}m/s${vAng}D.data
+write_restart    ${vTemp}K${vSpe}m/s${vAng}D.restar
+unfix            force
+unfix            temp 
+unfix            temp2 
+uncompute        Difmassdensity
+unfix            DensitySlab 
+unfix            energy
+unfix            Intgroup 
+shell            cd ../
+next             vAng
+jump             in.imp.txt loopAng
+next             vSpe
+jump             in.imp.txt loopSpe
+print            "Job's done" 

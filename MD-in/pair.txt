@@ -1,0 +1,15 @@
+pair_coeff 1 1 lj/cut 0.5270 2.3210 #Fe-Fe
+pair_coeff 1 2 lj/cut 0.0960 2.9800 #Fe-Si
+pair_coeff 1 3 lj/cut 0.0724 2.2852 #Fe-Mn
+pair_coeff 1 4 lj/cut 0.5143 2.3285 #Fe-Cr
+pair_coeff 1 5 lj/cut 0.5235 2.3014 #Fe-Ni
+pair_coeff 2 2 lj/cut 0.0175 3.8260 #Si-Si
+pair_coeff 2 3 lj/cut 0.0132 2.9340 #Si-Mn
+pair_coeff 2 4 lj/cut 0.0937 2.9896 #Si-Cr
+pair_coeff 2 5 lj/cut 0.0954 2.9548 #Si-Ni
+pair_coeff 3 3 lj/cut 0.0099 2.2500 #Mn-Mn
+pair_coeff 3 4 lj/cut 0.0706 2.2926 #Mn-Cr
+pair_coeff 3 5 lj/cut 0.0719 2.2659 #Mn-Ni
+pair_coeff 4 4 lj/cut 0.5020 2.3360 #Cr-Cr
+pair_coeff 4 5 lj/cut 0.5109 2.3088 #Cr-Ni
+pair_coeff 5 5 lj/cut 0.5200 2.2820 #Ni-Ni

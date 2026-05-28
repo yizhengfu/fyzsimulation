@@ -1,0 +1,108 @@
+#第一步压缩模型，压力选择成型时候的压力
+variable  		fDGEBA   index dgeba
+variable  		f1 index 1
+variable  		f2 index 2
+variable  		f3 index 3
+variable  		filename index slab 
+variable        vPre     equal 0.101        #压力单位MPa 常压1atm=0.101Mpa 指进行NPT平衡时的压力为1个大气压
+variable        vPress   equal ${vPre}*9.87 #压力 1MPa=9.87atm 指进行NPT平衡时的压力
+variable  		vTemp    equal 300
+variable  		vNVTStep equal 100000        #第一阶段NVT平衡
+variable  		vNVEStep equal 100000        #第二阶段施加压力 限制原子一个时间步内移动的最大距离
+variable  		vThermoStep equal 1000
+variable  		vFrestep equal 1000
+variable  		vPush    equal 1             #单位为MPa 施加压缩时候的压力
+variable        vHidif   equal 2             #单位为A 判读高度差
+variable        vdt      equal 1
+##-------------------------------------------------------
+clear
+units           real  #用compass转的data文件，单位为kcal/mol   
+boundary        p p p
+dimension       3
+atom_style      full
+log 		    log.press.txt
+neighbor        2.0 bin
+neigh_modify    every 2 delay 10 check yes 
+pair_style	    lj/class2 12.5 
+bond_style      class2
+angle_style     class2
+dihedral_style	class2
+improper_style  class2  
+##----------------------------------------------------------------------------------------
+read_data	    ${fDGEBA}.data group DGEBA extra/atom/types 3 extra/bond/types 3 extra/angle/types 3 extra/dihedral/types 3 extra/improper/types 3 
+read_data	    ${f1}.data group TGra add append offset 15 22 40 54 40 shift 9 -2 0                         
+read_data	    ${f2}.data group ZGra add append offset 16 23 41 55 41 shift 9 -2 0
+read_data	    ${f3}.data group BGra add append offset 17 24 42 56 42 shift 9 -2 0
+write_data      Layer.data 
+##---------------Minimize-------------------------------------------------
+##----------------Initial
+velocity        TGra set 0.0 0.0 0.0 units box #固定上部石墨烯
+velocity        ZGra set 0.0 0.0 0.0 units box #固定中间石墨烯
+velocity        BGra set 0.0 0.0 0.0 units box #固定底部石墨烯
+fix             1 TGra setforce  0.0 0.0 0.0  
+fix 			2 ZGra setforce  0.0 0.0 0.0
+fix 			3 BGra setforce  0.0 0.0 0.0
+timestep        ${vdt}  #时间步长1fs
+minimize        2.0e-5 1.0e-3 1000 10000
+reset_timestep  0
+##----------------Initial--------------------------------------------------------
+velocity        DGEBA create ${vTemp} 5812775 dist gaussian loop geom  #随机速度，温度300K
+thermo          ${vThermoStep}
+thermo_style    custom  step pe ke etotal temp lx ly lz press atoms vol
+compute         cTall all temp
+thermo_modify   temp  cTall flush yes lost ignore
+###################### relax ###########################  第一阶段，平衡过程
+dump 			1 all custom ${vFrestep} ${filename}_EquNVT.lammpsstrjD id mass type xs ys zs element    
+dump_modify 	1 element C N H H S O N N O C C C C O H C C C 
+fix 			4 DGEBA nvt temp ${vTemp} ${vTemp} $(100.0*dt) #阻尼系数：一般设为100*timestep
+run 			${vNVTStep} 
+write_data      ${filename}_EquNVT.data
+write_restart 	${filename}_EquNVT.restart
+unfix 			1                                       
+unfix 			2
+unfix 			3
+unfix 			4
+######################### push limit ###################### 第二阶段，加载过程
+variable        tmqx equal "lx"
+variable        tmqy equal "ly"
+variable        vArea equal ${tmqx}*${tmqy}
+variable  		vForce equal 0.14393*0.001*${vPush}*${vArea}    #pressure压强=F压力/S面积  1eV/Angstrom3=160.21766208GPa(网上的公式)    
+fix 			1 TGra setforce  0.0 0.0 NULL
+fix 			2 TGra aveforce  NULL NULL -${vForce}
+fix 			3 BGra setforce  0.0 0.0 NULL
+fix 			4 BGra aveforce  NULL NULL ${vForce}
+fix 			5 all nve/limit 0.5  #限制原子一个时间步内移动的最大距离，控制原子不散开，0.00025固定值，都是A
+run 			${vNVEStep} 
+unfix 			5									  
+######################### push ###################### 
+#dump 			1 all custom ${vFrestep} ${filename}_PressNPT.lammpsstrjD id mass type xs ys zs element    
+#dump_modify 	1 sort id element C N H H S O N N O C C C C O H C C C 
+compute         massdensity DGEBA chunk/atom bin/1d z lower 0.01 units reduced   #沿Z方向的质量密度分布
+fix             profile DGEBA ave/chunk 1 1 1 massdensity density/mass file output_massdensity.txt
+fix             5 all npt temp ${vTemp} ${vTemp} $(100.0*dt) iso ${vPress} ${vPress} $(1000.0*dt) #drag 2
+fix_modify      5 temp cTall
+#开启循环，判断是继续压缩还是跳出循环
+label           loop
+variable        i loop 100
+variable        tmp equal "lz"
+variable        L0 internal ${tmp}
+run             1000  
+variable        tmq equal "lz"
+variable        L1 equal ${tmq}
+variable        Ld equal "(v_L0 - v_L1)"
+thermo_style    custom  step pe ke etotal temp lx ly lz press atoms vol v_Ld
+thermo_modify   temp  cTall flush yes lost ignore
+print           "${Ld}"
+if              "${Ld} < ${vHidif}" then "jump 1-in-press.txt break" #
+next            i
+jump            1-in-press.txt loop
+label           break
+write_data      push_slab.data									 
+write_restart 	push_slab.restart
+unfix           1
+unfix           2
+unfix           3
+unfix           4
+unfix           5
+print "All done"
+quit

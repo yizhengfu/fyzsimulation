@@ -1,0 +1,77 @@
+#初始模拟系统设置
+units         metal
+boundary      p p p
+atom_style    atomic
+neighbor	  2 bin
+timestep      0.001
+#构建模型
+lattice       fcc 3.56
+region	      box block 0 20 0 30 0 13
+create_box    6 box
+create_atoms  1 box
+
+#设置合金原子
+set           type 1 type/ratio 2 0.2 83456
+set           type 1 type/ratio 3 0.5 67565
+set           type 1 type/ratio 4 0.5 76783
+set           type 3 type/ratio 5 0.5 56893
+
+mass		  1 55.85 #Fe
+mass		  2 58.69 #Ni
+mass		  3 52	  #Cr
+mass		  4 58.93 #Co
+mass		  5 27 #Al
+mass		  6 12 	  #C-ball
+
+#定义原子间相互作用势
+pair_style     hybrid lj/cut 10 eam/alloy tersoff
+pair_coeff     * * eam/alloy FeNiCrCoAl-heaweight.setfl Fe Ni Cr Co Al NULL
+pair_coeff     * * tersoff SiC.tersoff NULL NULL NULL NULL NULL C
+pair_coeff     1 6 lj/cut 0.038687 2.8605
+pair_coeff     2 6 lj/cut 0.038429 2.841
+pair_coeff     3 6 lj/cut 0.037758 2.868
+pair_coeff     4 6 lj/cut 0.038281 2.842
+pair_coeff     5 6 lj/cut 0.003457 3.1325
+
+#定义输出信息
+thermo    100
+thermo_style  custom step temp pe lx ly lz
+
+#能量最小化
+dump	1 all atom 50 mini.xyz
+min_style	cg
+minimize	1e-10 1e-10 5000 5000
+undump	1
+reset_timestep 0
+
+#温度初始化
+velocity   all create 300 88989
+
+#npt1
+dump      1 all custom 10000 npt1.xyz id type x y z
+fix        1 all npt temp 300 3000 0.1 x 0 0 1 y 0 0 1 z 0 0 1
+run         50000
+reset_timestep 0
+undump	1
+unfix	1
+
+#npt1
+dump      1 all custom 10000 npt2.xyz id type x y z
+fix        1 all npt temp 3000 300 0.1 x 0 0 1 y 0 0 1  z 0 0 1
+run         50000
+reset_timestep 0
+undump	1
+unfix	1
+
+#npt1
+dump      1 all custom 10000 nvt.xyz id type x y z
+fix        1 all nvt temp 300 300 0.1
+run         50000
+reset_timestep 0
+undump	1
+unfix	1
+
+write_restart restart.equil
+
+
+

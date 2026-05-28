@@ -1,0 +1,37 @@
+模型转化：msi2lmp.exe Layer -class 2 -frc compass.frc -i >Layer.lammps
+模拟运算：mpiexec -np 8 lmp.exe < in.Diff.txt
+两个data文件合并，切记要修改data文件中的参数，主要包括x，y，z初始值归0
+必须先分层，否则水会团聚
+如果开始为PPS，边界可能会被拉长
+如果有wall 则边界不能为周期性
+等bond 类型等源文件在z方向 0，zlo+zhi；后文件变成 0， -（zlo+zhi）
+1Kcal/mol·A等于多少6.95e-11N
+compass 力场采用 lj/class2/coul/long 需要 kspace_style ewald 1.0e-4 但要求周期性
+1、MS建模
+2、 MS转data文件
+3、修改Mof.data 文件，补全力场参数
+4、合并成为Bottom文件 两个data文件合并，源文件在z方向 0，zlo+zhi；后文件变成 0， -（zlo+zhi）
+5、合并成为整个文件
+nve/limit 0.005
+
+variable vFrestep    equal 10000       #Dump step
+variable vEqustep   equal  500000      #平衡E时间  
+variable vDifstep   equal  10000000    #扩散时间
+
+
+variable vFrestep    equal 100       #Dump step
+variable vEqustep   equal  1000      #平衡E时间  
+variable vDifstep   equal  1000    #扩散时间
+
+fix 1 Pre nve/limit 0.00005 石墨烯
+pair_coeff      1 1 lj/class2/coul/cut 0.0800000000   3.8400000000
+pair_coeff      2 2 lj/class2/coul/cut 0.0080000000   1.0870000000
+pair_coeff      3 3 lj/class2/coul/cut 0.0700000000   4.0530000000
+pair_coeff      4 4 lj/class2/coul/cut 0.0230000000   2.8780000000
+pair_coeff      5 5 lj/cut 0.124000 2.461553
+pair_coeff      6 6 lj/cut 0.105000 3.430851
+pair_coeff      7 7 lj/cut 0.044000 2.571134
+pair_coeff      8 8 lj/cut 0.044000 2.571134
+
+variable vDPrehi equal bound(Pre,zmax)
+fix fwall Pre wall/reflect zlo v_vDPrehi

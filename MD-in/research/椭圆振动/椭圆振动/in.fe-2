@@ -1,0 +1,142 @@
+#初始条件
+dimension                   3                                     
+boundary                    p p p                                    
+units                       metal    
+atom_style                  atomic
+timestep                    0.001
+
+read_data                   Fe.lmp
+
+#势函数
+pair_style                  hybrid eam/fs tersoff morse 3
+pair_coeff                  * * eam/fs  Fe_5.eam.fs Fe NULL NULL 
+pair_coeff                  * * tersoff 1989SiC.tersoff NULL Si C 
+pair_coeff                  1 2 morse  0.6632 1.5109 2.7335
+pair_coeff                  1 3 morse  0.7214 1.5938 2.4901
+
+#能量最小化
+dump                        1 all atom 50 1mini.xyz
+thermo                      100
+min_style                   cg
+minimize                    1e-15 1e-15 5000 5000
+undump                      1
+reset_timestep              0
+
+#速度初始化
+velocity                    all create 300 8877423 
+
+#弛豫
+fix                         1 all nvt temp 300 300 0.1
+thermo                      100
+thermo_style                custom step temp etotal ke pe press pxx pyy pzz
+dump                        1 all atom 500 2nvt.xyz
+run                         20000
+undump                      1
+unfix                       1
+reset_timestep              0
+
+#扩大盒子
+change_box                  all x final 0 250 z final 0 150 units box
+
+#刀具
+region                      r1 block 180 220 0 57.26 60 100 units box 
+region                      p1 plane 180 0 60 1 0 -0.25
+region                      p2 plane 180 0 60 -0.15 0 1
+region                      tool intersect 3 r1 p1 p2 
+
+#刀具 碳化硅SiC
+lattice                     custom 4.354 a1 1.0 0.0 0.0 a2 0.0 1.0 0.0 a3 0.0 0.0 1.0 &
+basis                       0.75 0.25 0.75 &
+basis                       0.75 0.75 0.25 &
+basis                       0.25 0.25 0.25 &
+basis                       0.25 0.75 0.75 &
+basis                       0.00 0.00 0.00 &
+basis                       0.00 0.50 0.50 &
+basis                       0.50 0.00 0.50 &
+basis                       0.50 0.50 0.00 
+
+create_atoms                2 region tool &
+basis                       1 2 &
+basis                       2 2 &
+basis                       3 2 &
+basis                       4 2 &
+basis                       5 3 &
+basis                       6 3 &
+basis                       7 3 &
+basis                       8 3 &     
+
+#分层
+region                      boundary1    block 0 171.78 INF INF 0 5 units box
+region                      boundary2    block 0 5 INF INF 5 71.575 units box
+region                      boundary     union  2  boundary1  boundary2
+
+region                      temp_layer1    block 5 171.78 INF INF 5 10 units box
+region                      temp_layer2    block 5 10 INF INF 10 71.575 units box
+region                      temp_layer     union  2  temp_layer1  temp_layer2
+
+region                      newton_layer  block 10 171.78 INF INF 10 71.575 units box
+
+region                      piece union 3 boundary temp_layer newton_layer
+
+#分组
+group                       boundary region boundary
+group                       temp_layer region temp_layer
+group                       newton_layer region newton_layer
+group                       tool region tool
+group                       piece region piece
+group                       mobile union temp_layer newton_layer
+
+#box 模拟盒子
+region                      box union 2 piece tool
+
+#输出模型
+write_data                  C-SiC.data
+change_box                  all boundary s p s  
+
+#势函数
+pair_style                  hybrid eam/fs tersoff morse 3
+pair_coeff                  * * eam/fs  Fe_5.eam.fs Fe NULL NULL 
+pair_coeff                  * * tersoff 1989SiC.tersoff NULL Si C 
+pair_coeff                  1 2 morse  0.6632 1.5109 2.7335
+pair_coeff                  1 3 morse  0.7214 1.5938 2.4901
+
+#计算原子温度
+compute                     KE piece ke/atom
+variable                    KB equal 8.625e-5
+variable                    TEMP atom c_KE/1.5/${KB}
+
+compute                     new_temp1  temp_layer   temp/com
+compute                     new_temp2 newton_layer  temp/com
+
+thermo                      100
+thermo_style                custom step temp c_new_temp1 c_new_temp2 etotal ke pe 
+
+#振动切削 A B 振幅 T 周期 f=1/T(GHz) 1/0.5=20GHz 椭圆振动swiggle(sin) cwiggle(cos) 同频不同幅
+variable                    A equal 4.0
+variable                    B equal 6.0
+variable                    T equal 4.0
+variable                    omega equal 2.0*PI/$T
+variable                    x1 equal cwiggle(0.0,$A,$T)-(1*step*dt)
+variable                    x2 equal swiggle(0.0,$B,$T)
+variable                    v1 equal v_omega*($A+swiggle(0.0,$A,$T))-1
+variable                    v2 equal v_omega*($B-cwiggle(0.0,$B,$T))
+fix                         22 tool move variable v_x1 NULL v_x2 v_v1 NULL v_v2 units box 
+
+#输出数据
+dump                        1 all custom 500 3cut.xyz id type x y z v_TEMP 
+
+#刀具
+fix                         10 tool setforce 0 0 0 
+
+#牛顿层
+fix                         20 newton_layer nve
+
+#控温
+fix                         30 temp_layer nve
+fix                         31 temp_layer temp/berendsen 300.0 300.0 0.01
+fix_modify                  31 temp new_temp1
+
+#边界固定
+velocity                    boundary set 0 0 0 
+fix                         40 boundary setforce 0.0 0.0 0.0  
+run                         70000

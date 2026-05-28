@@ -1,0 +1,156 @@
+# VARIABLES
+variable fname index xlink_final.data300K0.101MPa_Equ4NPT.data
+variable vFixpercent equal 0.2  #夹具的长度占总长的比值
+variable vTenPercent equal 1    #最终的应变率，控制模拟时间
+variable vTemp       equal 300
+variable vTimestep equal 1
+#variable vFrestep  equal 1000
+#variable vTentime equal 90000
+##############----------------loop Press
+label loopPre 
+variable vPre index 0.101  #温度
+#variable vPre equal 0.101         #单位MPa 常压1atm=0.101Mpa   改为0再试一下
+variable vPress equal ${vPre}*9.87  #压力 1MPa=9.87atm 
+##############----------------loop Velocity
+label loopVel
+variable vVel index 4e-4 # 速度的单位A/fs
+##############----------------
+shell mkdir ${vPre}MPa${vVel}
+shell cd ${vPre}MPa${vVel}
+##############----------------Initial----------------
+log ${vPre}MPa${vVel}.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+pair_style lj/class2/coul/cut 12.5 12.5
+#pair_style lj/class2/coul/long 12.5
+#kspace_style ewald 1.0e-4   
+read_data ../${fname}
+#read_restart ../${fname}
+##############----------------Boundary
+change_box all boundary p p s 
+#comm_style tiled
+#fix fixbalance all balance 1000 1.2 rcb
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------Group
+variable vDzhi equal bound(all,zmax)
+variable vDzlo equal bound(all,zmin)
+variable vDzle equal ${vDzhi}-${vDzlo}
+variable vDfle equal ${vDzle}*${vFixpercent}
+variable vzmax equal ${vDzhi}-${vDfle}
+variable vzmin equal ${vDzlo}+${vDfle}
+variable vDMle equal ${vzmax}-${vzmin}
+region Low block INF INF INF INF INF ${vzmin} units box
+region Top block INF INF INF INF ${vzmax} INF units box
+group Low region Low 
+group Top region Top
+group Boundary union Low Top 
+group Mobile subtract all Boundary
+##############----------------Temper controllers
+velocity Mobile create ${vTemp} 4928459 dist gaussian units box
+compute cTMobile Mobile temp
+compute cTMobile1 Mobile temp/partial 1 1 0
+compute cTall all temp
+compute cTall1 all temp/partial 1 1 0
+##############----------------应力计算	
+compute	1 Mobile stress/atom NULL
+#compute 2 Mobile reduce sum c_1[1] c_1[2] #原来
+compute 2 Mobile reduce sum c_1[1] c_1[2] c_1[3] 
+variable vMvol equal lx*ly*(lz-2*${vDfle})
+variable vStress equal c_2[1]/(v_vMvol*10000)  #mental 为 GPa
+variable p1 equal (-pxx*1.01325)/10000 #单位1atm转1bar再转GPa 常压1atm=0.101Mpa
+variable p2 equal (-pyy*1.01325)/10000
+variable p3 equal (-pzz*1.01325)/10000
+##############----------------应变计算	
+variable lzn equal lz-2*${vDfle}
+variable lz0 equal ${lzn}
+variable vStrain equal (v_lzn-v_lz0)/v_lz0
+variable vTentime equal floor(((1+${vTenPercent})*${vDMle}/(2*${vVel}))/1000)*1000
+variable Nrepeat equal ${vTentime}/${vFrestep}
+fix tension all ave/time 1 1 100 v_vStrain v_vStress v_p3 file Tension_${vTemp}_${vVel}.txt
+##############----------------Thermo
+thermo_style custom step press temp pe ke etotal epair ebond eangle edihed lx ly lz vol v_p1 v_p2 v_p3 
+thermo_modify temp cTMobile1 lost ignore lost/bond ignore
+thermo 100
+##############----------------Dump
+#dump 1 all atom ${vFrestep} Tension_${vTemp}_${vVel}.xyz
+dump 1 all custom ${vFrestep} Tensile_${vTemp}_${vVel}.lammpstrj id mass type x y z vx vy vz xs ys zs element &
+   c_1[1] c_1[2] c_1[3] c_1[4] c_1[5] c_1[6]    
+dump_modify 1 element C N O C H H C O C C C C C S 
+##############----------------Energy
+variable etotal equal etotal  
+variable epair  equal epair
+variable evdwl  equal evdwl
+variable ecoul  equal ecoul
+variable ebond  equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable eimp   equal eimp
+variable emol   equal emol
+variable elong  equal elong 
+variable etail  equal etail
+variable enthalpy  equal enthalpy  
+fix energy all ave/time 10 10 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file Energy_${vTemp}_${vVel}.txt
+##############----------------group/group
+#compute cIntCH4H2O CH4 group/group H2O
+#fix interact all ave/time 10 10 ${vFrestep} c_cIntCH4H2O ave one file Interact_${vTemp}_${vVel}.txt
+#fix interactave all ave/time ${vFrestep} ${Nrepeat} ${vTentime} c_cIntCH4H2O ave one file Interact_${vTemp}_${vVel}.txt
+##############----------------massdensity   
+compute massdensity all chunk/atom bin/1d z lower 0.01 units reduced
+fix massdensity all ave/chunk 1 1 ${vFrestep} massdensity density/mass file Massdensity_${vTemp}_${vVel}.txt
+##############----------------Temperature
+compute tempdistribution all chunk/atom bin/1d z lower 0.01 units reduced  
+compute myChunk all temp/chunk tempdistribution temp
+fix tempdistribution all ave/chunk 10 10 ${vFrestep} tempdistribution temp file Tempdistribution_${vTemp}_${vVel}.txt
+##############----------------pe/ke
+compute cAtompe all pe/atom
+compute czAllpe all reduce sum c_cAtompe
+compute cAtomke all ke/atom
+compute czAllke all reduce sum c_cAtomke
+fix peke all ave/time 10 10 ${vFrestep} c_czAllpe c_czAllke ave one file PEKE_${vTemp}_${vVel}.txt
+fix pekeave all ave/time ${vFrestep} ${Nrepeat} ${vTentime} c_czAllpe c_czAllke ave one file PEKEave_${vTemp}_${vVel}.txt
+##############----------------msd     
+compute cMSDall all msd com yes 
+variable vtwopointall equal c_cMSDall[4]/6/(step*dt+1.0e-6) 
+fix MSD all vector 1000 c_cMSDall[4]
+variable vfitslopeall equal slope(f_MSD)/6/(1000*dt)
+fix MSDall all ave/time 1 1 ${vFrestep} c_cMSDall[1] c_cMSDall[2] c_cMSDall[3] c_cMSDall[4] v_vtwopointall v_vfitslopeall file MSDall_Ten_${vTemp}_${vVel}.txt
+##############----------------RG
+compute RG all gyration                         #计算polymer的均方回转半径
+fix RG all ave/time 10 10 1000 c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file RG_${vTemp}_${vVel}.txt #每100个间隔取一个值，10个值求一次平均，每1000步输出一个值
+fix RGave all ave/time ${vFrestep} ${Nrepeat} ${vTentime} c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file RGave_${vTemp}_${vVel}.txt    #（XX,YY,ZZ,XY,YZ,XZ）
+##############----------------拉伸时系综设置
+##############----------------设置中间变形区域速度梯度	
+velocity Top set 0.0 0.0 ${vVel}
+velocity Low set 0.0 0.0 -${vVel}
+velocity Mobile ramp vz -${vVel} ${vVel} z ${vzmin} ${vzmax} sum yes units box
+fix fLow Low setforce 0.0 0.0 0.0
+fix fTop Top setforce 0.0 0.0 0.0
+fix 2 all nvt temp ${vTemp} ${vTemp} 100 
+#fix 1 all nve/limit 0.1
+#fix 2 all temp/berendsen ${vTemp} ${vTemp} 100.0
+fix_modify 2 temp cTMobile1
+##############----------------启动运算
+run	${vTentime}
+write_data ${fname}.Ten_${vTemp}_${vVel}.data
+write_restart ${fname}.Ten_${vTemp}_${vVel}.restart
+#unfix 1
+unfix 2
+undump 1 
+undump 2
+#####################################################
+shell cd ../
+next vVel
+jump in-ten.txt loopVel
+next vTemp
+jump in-ten.txt loopTem
+print "All done"

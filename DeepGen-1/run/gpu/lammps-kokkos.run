@@ -1,0 +1,9 @@
+#!/bin/bash
+#SBATCH --partition=debug
+#SBATCH -N 1
+#SBATCH -n 20
+#SBATCH -o %j.out
+#SBATCH -e %j.err
+#SBATCH --gres=gpu:1
+module load openmpi/5.0.5 lammps/kokkos
+mpirun -np 20 lmp_kokkos_cuda_mpi -k on g 1 -sf kk -pk kokkos newton on neigh half -in mgwat.in 

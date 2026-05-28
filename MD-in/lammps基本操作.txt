@@ -1,0 +1,109 @@
+模型转化：./msi2lmp.exe xlink_final -class 2 -frc compass.frc -i >Layer.lammps
+模拟运算：mpiexec -np 8 lmp.exe < in.Diff.txt
+        mpiexec -np 8 –sf gpu –pk gpu 1 lmp.exe < in-eq.txt
+        mpiexec -np 8 lmp.exe < 1-in-press.txt
+        mpiexec -np 8 lmp.exe < 3-in.imp.txt
+        mpiexec -np 8 lmp.exe < in-eq.txt
+        mpiexec -np 8 lmp.exe < in-ten.txt
+        mpiexec -np 8 lmp.exe < in-rdf.txt
+        mpiexec -np 8 lmp.exe < in-Tg.txt
+        mpiexec -np 8 lmp.exe < in.tension.txt
+        mpiexec -np 8 lmp.exe < in.tendeform.txt 
+        mpiexec -np 8 lmp.exe -in in.tendeform1.txt  
+        mpiexec -np 8 lmp.exe -in in.Shearvelocity.txt 
+        mpiexec -np 8 lmp.exe -in in.GAPdecom.txt
+        mpiexec -np 8 lmp.exe -in in.GAPEqu.txt
+        mpiexec -np 8 lmp.exe -in in.mk.SiC.lmp
+        reacnetgenerator --type dump -i dump.reaxc -a C H O --nohmm
+        reacnetgenerator --type bond -i bonds.reaxc -a C H O --nohmm
+        pip install rdkit 
+        python processing.py bonds.reax -i 1:6 -i 2:1 -norec 5
+        python analyzing.py bonds.reax.reac
+File "C:\ProgramData\Anaconda3\lib\site-packages\rdkit\Chem\__init__.py", line 23, in <module>
+    from rdkit.Chem.rdmolfiles import *
+ImportError: DLL load failed while importing rdmolfiles: 找不到指定的程序。
+
+        mpiexec –n x(此x换成你想使用的线程数) lmp –in in.xxx(xxx是文件类型) –sf gpu –pk gpu 1
+        -sf gpu -pk gpu 1
+并行运行命令：
+      set OMP_NUM_THREADS=4
+      lmp -pk omp 4 -sf omp -in in.meam.shear
+
+两个data文件合并，切记要修改data文件中的参数，主要包括x，y，z初始值归0
+必须先分层，否则水会团聚
+如果开始为PPS，边界可能会被拉长
+如果有wall 则边界不能为周期性
+等bond 类型等源文件在z方向 0，zlo+zhi；后文件变成 0， -（zlo+zhi）
+1Kcal/mol·A等于多少6.95e-11N
+compass 力场采用 lj/class2/coul/long 需要 kspace_style ewald 1.0e-4 但要求周期性
+1、MS建模
+2、 MS转data文件
+3、修改Mof.data 文件，补全力场参数
+4、合并成为Bottom文件 两个data文件合并，源文件在z方向 0，zlo+zhi；后文件变成 0， -（zlo+zhi）
+5、合并成为整个文件
+nve/limit 0.005
+###MS建模的时候尽量不要用重复单元建模，否则转lammps时
+variable vFrestep    equal 10000       #Dump step
+variable vEqustep   equal  500000      #平衡E时间  
+variable vDifstep   equal  10000000    #扩散时间
+
+
+variable vFrestep    equal 100       #Dump step
+variable vEqustep   equal  1000      #平衡E时间  
+variable vDifstep   equal  1000    #扩散时间
+
+fix 1 Pre nve/limit 0.00005 石墨烯
+pair_coeff      1 1 lj/class2/coul/cut 0.0800000000   3.8400000000
+pair_coeff      2 2 lj/class2/coul/cut 0.0080000000   1.0870000000
+pair_coeff      3 3 lj/class2/coul/cut 0.0700000000   4.0530000000
+pair_coeff      4 4 lj/class2/coul/cut 0.0230000000   2.8780000000
+pair_coeff      5 5 lj/cut 0.124000 2.461553
+pair_coeff      6 6 lj/cut 0.105000 3.430851
+pair_coeff      7 7 lj/cut 0.044000 2.571134
+pair_coeff      8 8 lj/cut 0.044000 2.571134
+
+variable vDPrehi equal bound(Pre,zmax)
+fix fwall Pre wall/reflect zlo v_vDPrehi
+
+variable vFrestep  equal 1000
+variable vEqu1time equal 500000
+variable vEqu2time equal 500000
+variable vEqu3time equal 200000
+variable vEqu4time equal 500000
+
+ammps转MS
+% ../bin/lmp2arc.exe -car water8.car <<EOF > water8.arc
+     > water8.pos
+     > EOF
+转化实例：./lmp2arc.exe -car /home/lmp/bench/try/PE-Test1.car <<EOF > /home/lmp/bench/try/PE-Test.arc
+          > /home/lmp/bench/try/g.pos
+          > EOF
+
+注意：<<EOF >中的F后边有一个空格
+
+
+
+variable vEqu1time equal 500000 #500000
+variable vEqu2time equal 500000 #500000
+variable vEqu3time equal 20000 #20000
+variable vEqu4time equal 500000 #500000
+variable vTimestep equal 1    #一般不修改 fs
+variable vFrestep  equal 1000 #一般不修改 每隔1000步保存1次
+variable vNrepeat  equal ${vEqu4time}/${vFrestep}  #一般不修改
+variable vAnnramp  equal 6 #6   #退火间隔
+variable vAnncyc   equal 5 #5   #退火循环次数
+variable vTemhi    equal 600    #K
+
+set PATH=C:\Users\XXX\AppData\Local\Programs\Python\Python38-32;%PATH%
+E:\fyzsimulation\ref>C:\Users\fyz\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Python 3.10
+set PATH=C:\Users\fyz\AppData\Roaming\Microsoft\Windows\Start Menu\Programs\Python 3.10;%PATH%
+
+variable vEqu1time equal 200000         #500000
+variable vEqu2time equal 300000         #500000
+variable vSurfTime equal 500000
+variable vEqu3time equal 200000
+variable vVisTime  equal 300000
+variable vFrestep  equal 1000
+variable vNrepert1 equal ${vSurfTime}/${vFrestep}
+variable vNrepert2 equal ${vVisTime}/${vFrestep}
+variable Ndump     equal 1000

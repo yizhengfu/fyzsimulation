@@ -1,0 +1,1438 @@
+Description of ReaxFF force fields
+==================================
+
+Disclaimer:  Using these forcefields for systems they have not been explicitly trained against
+may produce unrealistic results. Please see the full manuscripts for more detailed information.
+
+The force field files used by the SCM version of ReaxFF are compatible with those used by the
+original ReaxFF code. So if you have the force field information from somewhere else you can
+just use it (save it in a text file, and select it in AMSinput via the Other... option).
+
+There are currently two major groupings (i.e., the ReaxFF branches) of parameter sets that are
+intra-transferable with one another: (1) the combustion branch and (2) the aqueous (water) branch.
+The major difference between these two branches is in the O/H parameters, where the combustion
+branch focuses on accurately describing water as a gas-phase molecule, and the water branch is
+targeted at aqueous chemistry.
+
+AB.ff: (H/O/N/B) Ammonia Borane
+-------------------------------
+M.R.Weismiller, A.C.T. van Duin, J. Lee, R.A. Yetter
+    ReaxFF Reactive Force Field Development and Applications for Molecular Dynamics
+        Simulations of Ammonia Borane Dehydrogenation and Combustion
+    J. Phys. Chem. A 2010, 114, 5485-5492
+    http://dx.doi.org/10.1021/jp100136c
+    - QM data were generated describing the single and (if relevant) double and triple bond
+        dissociation for all B/N/O/H combinations. These data were used to derive initial
+        ReaxFF bond parameters, and all calculations were performed using DFT with the B3LYP
+        functional and the Pople 6-311G** basis set.
+    - The training set was then extended with QM data describing angular distortions in a set
+        of small AB-related (AB = H3N-BH3) molecules. These data were used to derive the
+        initial ReaxFF angular parameters.
+    - The training set was extended with reaction barriers for key reaction steps such as H2
+        release from AB, dimerization of H2B-NH2 and reaction energies associated with H2
+        release from AB and with AB oxidation.
+    - Branch: combustion.
+
+
+AuCSOH.ff: (Au/C/S/O/H)
+-----------------------
+J. A. Keith, D. Fantauzzi, T. Jacob, and A.C.T. van Duin
+    Reactive forcefield for simulating gold surfaces and nanoparticles
+    Physical Review B (2010) 81, 235404-1/235404-8
+    http://dx.doi.org/10.1103/PhysRevB.81.235404
+    - The original Au-Au parameters were extended by three publications:
+    - Au/O: K. Joshi, A.C.T. van Duin, and T. Jacob
+        Development of a ReaxFF description of gold oxides and initial application to cold
+            welding of partially oxidized gold surfaces
+        Journal of Materials Chemistry 20, (2010),  10431-10437
+        http://dx.doi.org/10.1039/C0JM01556C
+    - Au/C/S/H: T.T. Jarvi, A.C.T. van Duin, K. Nordlund, and W.A. Goddard
+        Development of interatomic ReaxFF potentials for Au-S-C-H systems
+        Journal of Physical Chemistry C 115, (2011), 10315-10322
+        http://dx.doi.org/10.1021/jp201496x
+    - C/O/H/S: Rahaman, O., van Duin, A. C. T., Goddard, W. A., III, and Doren, D. J.
+        Development of a ReaxFF reactive force field for glycine and application to solvent
+            effect and tautomerization
+        Journal of Physical Chemistry B 115 (2011), 249-261
+        http://dx.doi.org/10.1021/jp108642r
+    - The forcefield does not include Au/N parameters
+    - Branch: water.
+
+
+CHO.ff: (C/H/O) Hydrocarbon oxidation
+-------------------------------------
+K. Chenoweth, A.C.T. van Duin, W. A. Goddard
+    ReaxFF Reactive Force Field for Molecular Dynamics Simulations of Hydrocarbon Oxidation
+    J. Phys. Chem. A 2008, 112, 1040-1053
+    http://dx.doi.org/10.1021/jp709896w
+    - To obtain the H/C/O compound data required to extend the hydrocarbon-training set,
+        DFT calculations were performed on the following systems: (a) dissociation energies
+        for various bonds containing carbon, oxygen, and hydrogen.  The ground state structure
+        was obtained through full geometry optimization.  Dissociation curves were calculated
+        by constraining only the bond length of interest and re-optimization of the remaining
+        internal coordinates. Optimization was also performed for the various angles and
+        torsions associated with C/H/O interactions.
+    - Branch: combustion.
+
+
+HCONSB.ff: (H/C/O/N/S/B)
+------------------------
+M.R. Weismiller, A.C.T. van Duin, J. Lee, and R.A. Yetter,
+    ReaxFF Reactive Force Field Development and Applications for Molecular Dynamics
+        Simulations of Ammonia Borane Dehydrogenation and Combustion
+    J. Phys. Chem. A (2010), 114, 5485-5492.
+    http://dx.doi.org/10.1021/jp100136c
+    - The parameters in this forcefield were extended/improved by two other publications:
+    - A. M. Kamat, A.C.T. van Duin, and A. Yakovlev
+        Molecular Dynamics Simulations of Laser-Induced Incandescence of Soot Using an
+            Extended ReaxFF Reactive Force Field.
+        Journal of Physical Chemistry A (2010), 114, 12561-1257
+        http://dx.doi.org/10.1021/jp1080302
+    - F. Castro-Marcano, A.M. Kamat, M.F. Russo, A.C.T. van Duin, and J.P. Mathews
+        Combustion of an Illinois No. 6 Coal Char Simulated Using an Atomistic Char
+            Representation and the ReaxFF Reactive Force Field.
+        Combustion and Flame (2012), 159, 23273-1285
+        http://dx.doi.org/10.1016/j.combustflame.2011.10.022
+    - The C/H/O parameters are the same as in the CHO forcefield, with added S/C, S/H and S/O
+        descriptions. This force field was used in Castro et al, Combustion and Flame 2011
+    - The Boron and Nitrogen parameters are based on (but not identical to) the parameters
+        used in Weismiller et al, JPC-A 2010.
+    - Branch: combustion.
+
+
+CuCl-H2O.ff: (Cu/Cl/H/O)
+------------------------
+O. Rahaman, A.C.T. van Duin, V.S. Bryantsev, J.E. Mueller, S.D. Solares, W.A. Goddard III,
+        and D.J. Doren
+    Development of a ReaxFF Reactive Force Field for Aqueous Chloride and Copper Chloride
+    J. Phys. Chem. A 114 (2010), 3556-3568
+    http://dx.doi.org/10.1021/jp9090415
+    - This forcefield is an extension of:
+        A.C.T. van Duin, V.S. Bryantsev, M.S. Diallo, W.A. Goddard, O. Rahaman, D.J. Doren,
+            D. Raymand, and K. Hermansson
+        Development and validation of a ReaxFF reactive force field for Cu cation/water
+            interactions and copper metal/metal oxide/metal hydroxide condensed phases
+        Journal of Physical Chemistry A 2010, 114, 9507-9514
+        http://dx.doi.org/10.1021/jp102272z
+    - Branch: water.
+
+
+FeOCHCl.ff: (Fe/O/C/H/Cl)
+-------------------------
+M. Aryanpour, A.C.T. van Duin, J.D. Kubicki
+    Development of a Reactive Force Field for Iron-Oxyhydroxide Systems
+    J. Phys. Chem. A 2010, 114, 6298-6307
+    http://dx.doi.org/10.1021/jp101332k
+    - The Cl parameters where published by:
+        O. Rahaman, A.C.T. van Duin, V.S. Bryantsev, J.E. Mueller, S.D. Solares,
+            W.A. Goddard III, and D.J. Doren
+        Development of a ReaxFF Reactive Force Field for Aqueous Chloride and Copper Chloride
+        J. Phys. Chem. A 114 (2010), 3556-3568
+        http://dx.doi.org/10.1021/jp9090415
+    - The initial force field parameters for the Fe-Fe parameters were taken from an earlier
+        force field development project on bulk-iron metal, based on DFT-calculations on
+        antiferromagnetic BCC and FCC. The ReaxFF parameters have not been published yet,
+        however the DFT data can be found in ref 31 of the above mentioned manuscript.
+        The O/H parameters were taken from the ReaxFF bulk water description. The Fe/Fe and
+        O/H parameters were kept fixed to these initial values, whereas the Fe/O parameters
+        were reoptimized against the quantum mechanical results presented in the above
+        mentioned manuscript.
+    - Detailed information on the force field parameters is given in the supporting
+        information of the above mentioned manuscript.
+    - Branch: water.
+
+
+HE.ff: (C/H/O/N) RDX/High Energy
+--------------------------------
+L.Z. Zhang, A.C.T. van Duin, S.V. Zybin, and W.A. Goddard
+    Thermal Decomposition of Hydrazines from Reactive Dynamics Using the ReaxFF Reactive
+        Force Field
+    Journal of Physical Chemistry B (2009) 113, 10770-10778
+    http://dx.doi.org/10.1021/jp900194d
+    - Part of this forcefield is also published in:
+        L.Z. Zhang, S.V. Zybin, A.C.T. van Duin, S. Dasgupta, W.A. Goddard, and E.M. Kober
+        Carbon Cluster Formation during Thermal Decomposition of
+            Octahydro-1,3,5,7-tetranitro-1,3,5,7-tetrazocine and
+            1,3,5-Triamino-2,4,6-trinitrobenzene
+            High Explosives from ReaxFF Reactive Molecular Dynamics Simulations
+        Journal of Physical Chemistry A (2009) 113, 10619-10640
+        http://dx.doi.org/10.1021/jp901353a
+
+    - The parameters of the nitramine ReaxFF are based on a large number of ab initio QM
+        calculations. Over 40 reactions and over 1600 equilibrated molecules have been used;
+        they are designed to characterize the atomic interactions under various environments
+        likely and unlikely high energy each atom can encounter. The training set contains
+        bond breaking and compression curves for all possible bonds, angle and torsion bending
+        data for all possible cases, as well as crystal data.
+    - Please see the supplimental material from Phys. Rev. Lett. 2003, 91, 098301 for a
+        detailed description of the parameterization of this force field.
+    - Branch: combustion.
+
+
+HE2.ff: (C/H/O/N/S/Si) RDX/High Energy
+--------------------------------------
+L.Z. Zhang, S.V. Zybin, A.C.T. van Duin, S. Dasgupta, W.A. Goddard, and E.M. Kober
+    Carbon Cluster Formation during Thermal Decomposition of
+        Octahydro-1,3,5,7-tetranitro-1,3,5,7-tetrazocine and
+        1,3,5-Triamino-2,4,6-trinitrobenzene
+        High Explosives from ReaxFF Reactive Molecular Dynamics Simulations
+    Journal of Physical Chemistry A (2009) 113, 10619-10640
+    http://dx.doi.org/10.1021/jp901353a
+    - Similar to HE.ff with additional parameters fitted for the TATB explosive
+    - Branch: combustion.
+
+
+NaH.ff: (Na/H)
+--------------
+J.G.O. Ojwang, R. Van Santen, G.J. Kramer, A.C.T van Duin, and W.A Goddard
+    Modeling the sorption dynamics of NaH using a reactive force field
+    Journal of Chemical Physics 2008, 128, 164714
+    http://dx.doi.org/10.1063/1.2908737
+    - This forcefield originally had a typo, defining the H-Na-Na angle twice. The same typo
+        is in table 4 of the publication, but the text clearly mentions that the second line
+        should define Na-H-Na instead.
+    - Branch: combustion.
+
+
+NiCH.ff: (Ni/C/H)
+-------------------------------
+J.E. Mueller, A.C.T. van Duin, and W.A. Goddard III
+    Development and Validation of ReaxFF Reactive Force Field for Hydrocarbon Chemistry
+        Catalyzed by Nickel
+    J. Phys. Chem. C 2010, 114, 4939-4949
+    http://dx.doi.org/10.1021/jp9035056
+    - Branch: combustion.
+
+
+SiOH.ff: (Si/O/H)
+-----------------
+J.C. Fogarty, H.M. Aktulga, A.Y. Grama, A.C.T. van Duin, S.A. Pandit
+    A reactive molecular dynamics simulation of the silica-water interface
+    J. Chem. Phys. 2010, 132, 174704
+    http://dx.doi.org/10.1063/1.3407433
+    - This force field was trained to model the interaction of water at the SiO2 surface,
+        with specific emphasis on proton-transfer reactions.  Updated parameters were fitted
+        for all Si/O/H bond, angle, and torsion interactions as well, in addition to the
+        dissociation of a water molecule from a single Si(OH)4 molecule and reaction energies
+        for the polymerization of Si(OH)4
+    - Branch: water.
+
+
+SiC.ff: (Si/C/O/H/N/S)
+----------------------
+D. Newsome, D. Sengupta, H. Foroutan, M.F. Russo, and A.C.T. van Duin
+    Oxidation of Silicon Carbide by O2 and H2O: A ReaxFF Reactive Molecular Dynamics Study,
+        Part I
+    Journal of Physical Chemistry 2012 116, 16111-16121
+    http://dx.doi.org/10.1021/jp306391p
+    - The included forcefield is based on the Newsome reference, with slightly improved
+        parameters by van Duin et al.
+    - Branch: combustion.
+
+
+VOCH.ff: (V/O/C/H)
+------------------
+K. Chenoweth, A.C.T. van Duin, P. Persson, M.J. Cheng, J. Oxgaard, W.A. Goddard
+    Development and Application of a ReaxFF Reactive Force Field for Oxidative
+        Dehydrogenation on Vanadium Oxide Catalysts
+    J. Phys. Chem. C, 2008, 112, 14645-14654
+    http://dx.doi.org/10.1021/jp802134x
+    - The ReaxFF force field parameters have been fit to a large quantum mechanics (QM)
+        training set containing over 700 structures and energetics related to bond
+        dissociations, angle and dihedral distortions, and reactions between hydrocarbons and
+        vanadium oxide clusters.
+        In addition, the training set contains charge distributions for small vanadium oxide
+        clusters and the stabilities of condensed-phase systems including V2O5, VO2, and V2O3
+        in addition to metallic V (V0).
+    - Branch: combustion.
+
+
+ZnOH.ff: (Zn/O/H)
+-----------------
+D. Raymand, A.C.T. van Duin, M. Baudin, K. Hermannson
+    A reactive force field (ReaxFF) for zinc oxide
+    Surface Science 2008, 602, 1020-1031
+    http://dx.doi.org/10.1016/j.susc.2007.12.023
+    - updated version published by:
+        D. Raymand, A.C.T. van Duin, D. Spangberg, W.A. Goddard, K. Hermansson
+            Water adsorption on stepped ZnO surfaces from MD simulation
+            Surface Science 2010, 604, 9-10, 741-752
+            http://dx.doi.org/10.1016/j.susc.2009.12.012
+    - Based on QM calculations for Zn(s), ZnO(s), and Zn hydroxide clusters [Zn(OH)2 and
+        O(ZnOH)2], ReaxFF parameters were generated for Zn-O and Zn-Zn bond energies and for
+        Zn-O-Zn, O-Zn-O, O-Zn-Zn and Zn-O-H valence angle energies.
+    - QM calculations were performed for the four crystal polymorphs of the wurtzite,
+        zincblende, rocksalt and caesium chloride structures (the structures are also referred
+        to as h-ZnS, c-ZnS, NaCl and CsCl, respectively).
+    - Branch: water.
+
+
+Al-H2O.ff: (Al/H/O)
+-------------------
+M. Russo, R. Li, M. Mench, and A.C.T. van Duin
+    Molecular Dynamic Simulation of Aluminum-Water Reactions Using the ReaxFF Reactive
+        Force Field
+    International Journal of Hydrogen Energy 36 (2011), 5828-5835
+    http://dx.doi.org/10.1016/j.ijhydene.2011.02.035
+    - Branch: water.
+
+
+CaSiAlO.ff: (C/H/O/Fe/Cl/Si/Al/Ca)
+----------------------------------
+M.C. Pitman and A.C.T. van Duin
+    Dynamics of Confined Reactive Water in Smectite Clay-Zeolite Composites
+    J. Am. Chem. Soc., 2012, 134 (6), 3042-3053
+    http://dx.doi.org/10.1021/ja208894m
+    - Branch: water.
+
+
+dispersion/CHONSSi-lg.ff: (C/H/O/N/S/Si)
+---------------------------------------
+L. Liu, Y. Liu, S.V. Zybin, H. Sun, and W.A. Goddard III
+    ReaxFF-lg: Correction of the ReaxFF Reactive Force Field for London Dispersion,
+        with Applications to the Equations of State for Energetic Materials
+    The Journal of Physical Chemistry A, 2011, 115(40), 11016-11022
+    http://dx.doi.org/10.1021/jp201599t
+    - This forcefield adds London dispersion correction terms to reaxFF, and is optimized
+        for the energetic materials RDX, PETN, TATB, and NM plus graphite, polyethylene,
+        solid carbon dioxide, and solid N2, using the low temperature crystal structures
+        to determine the lg correction parameters.
+    - Branch: combustion.
+
+
+CHOFeAlNiCuS.ff: (C/H/O/Fe/Al/Ni/Cu/S)
+--------------------------------------
+O. Rahaman, A.C.T. van Duin, W.A. Goddard III, and D.J. Doren
+    Development of a ReaxFF reactive force field for glycine and application to
+        solvent effect and tautomerization
+    Journal of Physical Chemistry B 115 (2011), 249-261.
+    http://dx.doi.org/10.1021/jp204894m
+    - C/O/H parameters only. The Cu/Fe/Al/Ni parameters are from:
+        Yun  K. Shin, H. Kwak, C. Zou, A.V. Vasenkov, and A.C.T. van Duin
+            Development and Validation of a ReaxFF Reactive Force Field for Fe/Al/Ni Alloys:
+                Molecular Dynamics Study of Elastic Constants, Diffusion, and Segregation
+            J. Phys. Chem. A, 2012, 116 (49), pp 12163--12174
+            http://dx.doi.org/10.1021/jp308507x
+    - Not all cross-terms between the two forcefield files are defined, which might cause
+        problems if the system has (for example) C-Cu interactions.
+    - Branch: water.
+
+
+AuSCH_2011.ff: (Au/S/C/H)
+-------------------------
+T.T. Jarvi, A.C.T. van Duin, K. Nordlund, and W.A. Goddard III,
+    Development of Interatomic ReaxFF Potentials for Au-S-C-H Systems
+    J. Phys. Chem. A, 115, 10315-10322 (2011)
+    http://dx.doi.org/10.1021/jp201496x
+    - Branch: combustion.
+
+
+AuSCH_2013.ff: (Au/S/C/H)
+-------------------------
+Gyun-Tack Bae and Christine M. Aikens
+    Improved ReaxFF Force Field Parameters for Au-S-C-H Systems
+    Journal of Physical Chemistry A 2013 117 (40), 10438-10446
+    http://dx.doi.org/10.1021/jp405992m
+    - Based upon: T.T. Jarvi, A.C.T. van Duin, K. Nordlund, and W.A. Goddard
+        Development of interatomic ReaxFF potentials for Au-S-C-H systems.
+        Journal of Physical Chemistry C 115, (2011), 10315-10322.
+    - yields improvements for bond bending potential energy surfaces
+    - aimes to agree with DFT geometries of small clusters and gold-thiolate nanoparticles
+    - Branch: combustion.
+
+
+PDMSDecomp.ff: (C/H/O/Si)
+-------------------------
+K. Chenoweth, S. Cheung, A.C.T. van Duin, W.A. Goddard III, and E.M. Kober
+    Simulations on the Thermal Decomposition of a Poly(dimethylsiloxane) Polymer
+        Using the ReaxFF Reactive Force Field
+    J. Am. Chem. Soc., 2005, 127 (19), pp 7192-7202
+    http://dx.doi.org/10.1021/ja050980t
+    - Specialized forcefield, designed to "investigate the failure of the
+        poly(dimethylsiloxane) polymer (PDMS) at high temperatures and pressures and in the
+        presence of various additives"
+    - Line from the torsion block was referring to non-existent atoms from the atomic
+        block and thus was removed.
+    - Branch: combustion.
+
+
+TiOCHNCl.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F)
+----------------------------------------
+S.Y. Kim, A.C.T. van Duin, and J.D. Kubicki
+    Molecular dynamics simulations of the interactions between TiO2 nanoparticles and water
+        with Na+ and Cl-, methanol, and formic acid using a reactive force field
+    Journal of Materials Research / Volume 28 / Issue 03 / 2013, pp 513-520
+    http://dx.doi.org/10.1557/jmr.2012.367
+    - used for simulating TiO2(both rutile and anatase) nanoparticles with water,
+        methanol, and formic acid
+    - The force field was validated by comparing water dissociative adsorption percentage and
+        bond length between Na-O with density functional theory (DFT) and experimental results
+    - Branch: water.
+
+
+PtCH.ff: (C/H/Pt)
+-----------------
+C.F. Sanz-Navarro, P. Astrand, De Chen, M. Ronning, A.C.T. van Duin, T. Jacob,
+        and W.A. Goddard III
+    Molecular Dynamics Simulations of the Interactions between Platinum Clusters and Carbon
+        Platelets
+    J. Phys. Chem. A 112, 1392-1402 (2008)
+    http://dx.doi.org/10.1021/jp074806y
+    - Branch: combustion.
+
+
+BaYZrCHO.ff: (C/H/O/Ba/Zr/Y)
+----------------------------
+A.C.T. van Duin, B.V. Merinov, S.S. Jang, and W.A. Goddard III
+    ReaxFF Reactive Force Field for Solid Oxide Fuel Cell Systems with Application to
+        Oxygen Ion Transport in Yttria-Stabilized Zirconia
+    J. Phys. Chem. A, 112, 3133-3140 (2008)
+    http://dx.doi.org/10.1021/jp076775c
+    - Branch: combustion.
+
+
+CHONSSiPtZrNiCuCo.ff: (C/H/O/N/S/Si/Pt/Zr/Ni/Cu/Co)
+---------------------------------------------------
+K.D. Nielson, A.C.T. van Duin, J. Oxgaard, W.Q. Deng, and W.A. Goddard III
+    Development of the ReaxFF Reactive Force Field for Describing Transition Metal Catalyzed
+         Reactions, with Application to the Initial Stages of the Catalytic Formation of
+         Carbon Nanotubes
+    J. Phys. Chem. A, 109, 493-499 (2005)
+    http://dx.doi.org/10.1021/jp046244d
+    - Branch: combustion.
+
+
+Glycine.ff: (C/H/O/N)
+---------------------
+O. Rahaman, A.C.T. van Duin, W.A. Goddard III, and D.J. Doren,
+    Development of a ReaxFF Reactive Force Field for Glycine and
+        Application to Solvent Effect and Tautomerization
+    J. Phys. Chem. B, 115, 249-261 (2011)
+    http://dx.doi.org/10.1021/jp108642r
+    - Line from the valence angle block was referring to non-existent atoms from the atomic
+        block and thus was removed.
+    - Branch: water.
+
+
+SiONH.ff: (C/H/O/N/Si/S)
+------------------------
+A.D. Kulkarni, D.G. Truhlar, S.G. Srinivasan, A.C.T. van Duin, P. Norman,
+        and T.E. Schwartzentruber
+    Oxygen Interactions with Silica Surfaces: Coupled Cluster and Density Functional
+        Investigation and the Development of a New ReaxFF Potential
+    J. Phys. Chem. C, 2013, 117 (1), pp 258-269
+    http://dx.doi.org/10.1021/jp3086649
+    - Aimed at oxygen interactions with realistic silica surfaces
+    - Lines from the valence angle block was referring to non-existent atoms from the
+        atomic block and thus was removed.
+    - Branch: combustion.
+
+
+CHOFe.ff: (C/H/O/Fe/Cl/Si/Al)
+-----------------------------
+Chenyu Zou, A.C.T. Van Duin
+    Investigation of Complex Iron Surface Catalytic Chemistry Using the ReaxFF Reactive
+        Force Field Method
+    JOM, December 2012, Volume 64, Issue 12, pp 1426-1437
+    http://dx.doi.org/10.1007/s11837-012-0463-5
+    - only the parameters for Fe (and crossterms) differ from the CHOAlSi.ff forcefield
+    - Branch: water.
+
+
+CHOAlSi.ff: (C/H/O/Fe/Cl/Si/Al)
+-------------------------------
+F. Castro-Marcanoa, A.C.T. van Duin
+    Comparison of thermal and catalytic cracking of 1-heptene from ReaxFF reactive
+        molecular dynamics simulations
+    Combustion and Flame, Volume 160, Issue 4, April 2013, Pages 766-775
+    http://dx.doi.org/10.1016/j.combustflame.2012.12.007
+    - only the parameters for Fe (and crossterms) differ from the CHOFe.ff forcefield
+    - Branch: water.
+
+
+CHOLi.ff: (C/H/O/N/S/Mg/P/Na/Li)
+--------------------------------
+D. Bedrov, G.D. Smith, A.C.T. van Duin
+    Reactions of Singly-Reduced Ethylene Carbonate in Lithium Battery Electrolytes: A
+        Molecular Dynamics Simulation Study Using the ReaxFF
+    Journal of Physical Chemistry A, 2012, 116 (11), pp 2978-2985
+    http://dx.doi.org/10.1021/jp210345b
+    - specifically generated for simulating Lithium battery electrolytes
+    - must be used in combination with the MOLCHARGE keyword to set a charge restraint on
+        Li and CO3!
+    - Branch: water.
+
+
+SiOAlLi.ff: (H/O/Si/Al/Li)
+--------------------------
+B. Narayanan, A.C.T. van Duin, B.B. Kappes, I.E. Reimanis and C.V. Ciobanu
+    A reactive force field for lithium-aluminum silicates with applications to
+        eucryptite phases
+    Modelling and Simulation in Materials Science and Engineering 2012 20 015002
+    http://dx.doi.org/10.1088/0965-0393/20/1/015002
+    - Branch: water.
+
+
+PdO.ff: (Pd/O)
+--------------
+T.P. Senftle, R.J. Meyer, M.J. Janik and A.C.T. van Duin
+    Development of a ReaxFF potential for Pd/O and application to palladium oxide formation
+    The Journal of Chemical Physics 139, 044109 (2013)
+    http://dx.doi.org/10.1063/1.4815820
+    - used for studying Oxidation states of Pd nanoparticles, surfaces and bulk configurations
+        with a GCMC method
+    - Branch: combustion.
+
+
+PdH.ff: (Pd/H)
+--------------
+T.P. Senftle, M.J. Janik and A.C.T. van Duin
+    A ReaxFF Investigation of Hydride Formation in Palladium Nanoclusters via Monte Carlo
+        and Molecular Dynamics Simulations
+    The Journal of Physical Chemistry C, 2014, 118 (9), pp 4967-4981
+    http://dx.doi.org/10.1021/jp411015a
+    - used in combination with a GCMC method
+    - Branch: combustion.
+
+
+Co.ff: (Co)
+-----------
+Xue-Qing Zhang, E. Iype, S.V. Nedea, A.P.J. Jansen, B.M. Szyja, E.J.M. Hensen,
+        and R.A. van Santen
+    Site Stability on Cobalt Nanoparticles: A Molecular Dynamics ReaxFF Reactive
+        Force Field Study
+    The Journal of Physical Chemistry C, 2014, 118 (13), pp 6882-6886
+    http://dx.doi.org/10.1021/jp500053u
+    - forcefield was generated using a recently developed Monte Carlo algorithm with
+        simulated annealing.
+    - Branch: combustion.
+
+
+CHONSMgPNaCuCl.ff: (C/H/O/N/S/Mg/P/Na/Cu/Cl)
+--------------------------------------------
+Susanna Monti, Cui Li, and Vincenzo Carravetta
+    Reactive Dynamics Simulation of Monolayer and Multilayer Adsorption of Glycine
+        on Cu(110)
+    J. Phys. Chem. C, 2013, 117 (10), pp 5221-5228
+    http://dx.doi.org/10.1021/jp312828d
+    - Reactive MD-force field for amino acids on copper
+    - Branch: water.
+
+
+CHOSMoNiLiBFPN.ff: (C/H/O/S/Mo/Ni/Li/B/F/P/N)
+---------------------------------------------
+Md M. Islam, V.S. Bryantsev, A.C.T. van Duin
+    ReaxFF Reactive Force Field Simulations on the Influence of Teflon on Electrolyte
+        Decomposition during Li/SWCNT Anode Discharge in Lithium-Sulfur Batteries
+    J. Electrochem. Soc. 2014 volume 161, issue 8, E3009-E3014
+    http://dx.doi.org/10.1149/2.005408jes
+    - forcefield for Electrochemistry in Li-S batteries
+    - Branch: combustion.
+
+
+CHONSSiNaFZr.ff: (C/H/O/N/S/Si/Na/F/Zr)
+---------------------------------------
+A. Rahnamoun and A.C.T. van Duin
+    Reactive Molecular Dynamics Simulation on the Disintegration of Kapton, POSS
+        Polyimide, Amorphous Silica, and Teflon during Atomic Oxygen Impact Using the
+        Reaxff Reactive Force-Field Method
+    J. Phys. Chem. A, 2014, 118 (15), pp 2780-2787
+    http://dx.doi.org/10.1021/jp4121029
+    - comments in the forcefield file: interactions with water and Na+ Fogarty et al.
+        JCP-2010 ; with glycine + C/H/F parameters; Si-F bond/offdiag/angle parameters;
+        Si-S dummy parameters + S-O-H parameters(Yun 2012 Oct8) + H-F bond/offdiag
+        (Jan14 2013 Joon) Jan31: added Zr/O/H/C
+    - Branch: water.
+
+
+TiClOH.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F)
+--------------------------------------
+Sung-Yup Kim and A.C.T. van Duin
+    Simulation of Titanium Metal/Titanium Dioxide Etching with Chlorine and Hydrogen
+        Chloride Gases Using the ReaxFF Reactive Force Field
+    J. Phys. Chem. A, 2013, 117 (27), pp 5655-5663
+    http://dx.doi.org/10.1021/jp4031943
+    - adaptation/evolution of the TiOCHNCl.ff forcefield by Kim, S.-Y. et al.
+    - Branch: water.
+
+
+CHONSSiNaAl.ff: (C/H/O/N/S/Si/Na/Al)
+------------------------------------
+C. Bai, L. Liu, and H. Sun
+    Molecular Dynamics Simulations of Methanol to Olefin Reactions in HZSM-5
+        Zeolite Using a ReaxFF Force Field
+    J. Phys. Chem. C, 2012, 116 (12), pp 7029-7039
+    http://dx.doi.org/10.1021/jp300221j
+    - used to simulate methanol to olefin (MTO) reactions in H-ZSM-5 zeolite
+    - Branch: water.
+
+
+undocumented/NiCH.ff: (Ni/C/H/O/N/S/F/Pt/Cl)
+--------------------------------------------
+Unknown
+    No Name
+    Not published
+    http://
+    - This forcefield is from april 2009, and is not published
+    - Branch: combustion.
+
+
+LiS.ff: (Li/S)
+--------------
+Md M. Islam, A. Ostadhossein, O. Borodin, A.T. Yeates, W.W. Tipton, R.G. Hennig, N. Kumar,
+        and A.C.T. van Duin
+    ReaxFF molecular dynamics simulations on lithiated sulfur cathode materials
+    Phys. Chem. Chem. Phys., 2015,17, 3383-3393
+    http://dx.doi.org/10.1039/C4CP04532G
+    - Developed for and used to study Sulfur cathode behaviour in Li battery cells
+    - Branch: combustion.
+
+
+CHONSSiPtNiCuCoZrYBa.ff: (C/H/O/N/S/Si/Pt/Ni/Cu/Co/Zr/Y/Ba)
+----------------------------------------------------------------
+B.V. Merinov, J.E. Mueller, A.C.T. van Duin, Qi An, and W.A. Goddard III
+    ReaxFF Reactive Force-Field Modeling of the Triple-Phase Boundary in a
+        Solid Oxide Fuel Cell
+    J. Phys. Chem. Lett., 2014, 5 (22), pp 4039-4043
+    http://dx.doi.org/10.1021/jz501891y
+    - Force field was developed by combining the YSZ and Ni/C/H descriptions
+    - From the summary: "The products obtained in our simulations are the same as those in
+        experiment, which indicates that the developed ReaxFF potential properly describes
+        complex physicochemical processes, such as the oxide-ion diffusion, fuel conversion,
+        water formation reaction, coking, and delamination, occurring at the TPB and can be
+        recommended for further computational studies of the fuel/electrode/electrolyte
+        interfaces in a SOFC"
+    - The Aa atom type is a rename of the Zr atom type, which was defined twice.
+    - Branch: combustion.
+
+
+CHONSSiNaP.ff: (C/H/O/N/S/Si/Na/P)
+----------------------------------
+Bo Zhang, A.C.T. van Duin and J.K. Johnson
+    Development of a ReaxFF Reactive Force Field for Tetrabutylphosphonium
+        Glycinate/CO2 Mixtures
+    J. Phys. Chem. B, 2014, 118 (41), pp 12008-12016
+    http://dx.doi.org/10.1021/jp5054277
+    - The forcefield file mentions "Gly with dummy N-P parameters"
+    - It was developed for studying Carbon dioxide interactions with the ionic liquid
+        tetrabutylphosphonium glycinate, both physical and chemical absorption.
+    - Several lines from valence angle block were referring to non-existent atoms from the
+        atomic block and thus were removed.
+    - Branch: combustion.
+
+
+CHOLi_2.ff: (C/H/O/Li)
+----------------------
+M. Raju, P. Ganesh, P.R.C. Kent, and A.C.T. van Duin
+    Reactive Force Field Study of Li/C Systems for Electrical Energy Storage
+    J. Chem. Theory Comput., 2015, 11 (5), pp 2156-2166
+    http://dx.doi.org/10.1021/ct501027v
+    - Used for studying Li/C systems with GCMC and MD
+    - Also contains parameters for "Vi" and "Gl", but these virtual elements are not
+        mentioned in the paper
+    - Parameters were fitted using a training set consisting, amongst others, of Li binding
+        energies on pristine graphene and graphite, Li migration pathways in graphite and
+        Li dissociation pathways in different hydrocarbons
+    - The forcefield was validated by a side-by-side comparison of ReaxFF and DFT energies
+        for Li binding on a divacancy, and ReaxFF and DFT ground-state configurations
+        for stage II and stage I stacking in graphite obtained using GCMC simulations
+    - The forcefield reproduces the in-plane Li ordering as well as the graphite stacking
+        sequence for stage II and stage I compounds
+    - Branch: water.
+
+
+CHONSSiCaCsKSrNaMgAlCu.ff: (C/H/O/N/S/Si/Ca/Cs/K/Sr/Na/Mg/Al/Cu)
+----------------------------------------------------------------
+G.M. Psofogiannakis, J.F. McCleerey, E. Jaramillo and A.C.T. van Duin
+    ReaxFF Reactive Molecular Dynamics Simulation of the Hydration of Cu-SSZ-13 Zeolite
+        and the Formation of Cu Dimers
+    J. Phys. Chem. C, 2015, 119 (12), pp 6678-6686
+   http://dx.doi.org/10.1021/acs.jpcc.5b00699
+    - This Cu/Si/Al/O/H forcefield was developed for and used in MD simulations of the
+        hydration of Cu-exchanged SSZ-13 catalyst.
+    - The force field was developed by merging and expanding previously tested and published
+        ReaxFF force fields for Si/Al/O/H systems and Cu/O/H systems (citations 19-26 of the
+        publication)
+    - This forcefield is an extension of K.L. Joshi et al 2014,
+        http://dx.doi.org/10.1039/C4CP02612H, all non-Cu parameters are the same.
+    - Branch: water.
+
+
+HOSMg.ff: (H/O/S/Mg)
+--------------------
+E. Iype, M. Hütter, A.P.J. Jansen, S.V. Nedea and C.C.M. Rindt
+    Parameterization of a reactive force field using a Monte Carlo algorithm
+    J. Comput. Chem., 2013, 34: 1143-1154
+    http://dx.doi.org/10.1002/jcc.23246
+    - This forcefield is optimized with a metropolis Monte-Carlo algorithm with simulated
+        annealing to search for the optimum parameters for the ReaxFF force field in a high-
+        dimensional parameter space.
+    - The optimization is done against a set of quantum chemical data for MgSO4 hydrates.
+    - Branch: combustion.
+
+
+CHONSMgPNaCuCl_v2.ff: (C/H/O/N/S/Mg/P/Na/Cu/Cl)
+--------------------------------------------
+S. Monti,  A. Corozzi, P. Fristrup, K.L. Joshi, Yun Kyung Shin, P. Oelschlaeger,
+        A.C.T. van Duin and V. Baronee
+    Exploring the conformational and reactive dynamics of biomolecules in solution using an
+        extended version of the glycine reactive force field
+    Phys. Chem. Chem. Phys., 2013,15, 15062-15077
+    http://dx.doi.org/10.1039/C3CP51931G
+    - This forcefield is an extension of CHONSMgPNaCuCl.ff by S. Monti et al.,
+        J. Phys. Chem. C, 2013, 117 (10), pp 5221-5228, http://dx.doi.org/10.1021/jp312828d
+    - Developed for peptide and protein simulations
+    - Branch: water.
+
+
+OPt.ff: (O/Pt)
+--------------
+D. Fantauzzi, J. Bandlow, L. Sabo, J.E. Mueller, A.C.T. van Duin and T. Jacob
+    Development of a ReaxFF potential for Pt-O systems describing the energetics and dynamics
+        of Pt-oxide formation
+    Phys. Chem. Chem. Phys., 2014,16, 23118-23133
+    http://dx.doi.org/10.1039/C4CP03111C
+    - Pt-Pt parameters for bulk platinum phases, low & high-index platinum surfaces and
+        nanoclusters.
+    - O-Pt parameters for bulk platinum oxides, as well as oxygen adsorption and oxide
+        formation on Pt(111) terraces and the {111} and {100} steps connecting them.
+    - Branch: combustion.
+
+
+CHONSMgPNaTiClF.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F)
+-----------------------------------------------
+Stijn Huygh, Annemie Bogaerts, Adri C.T. van Duin and Erik C. Neyts
+    Development of a ReaxFF reactive force field for intrinsic point defects in
+        titanium dioxide
+    Computational Materials Science, Volume 95, December 2014, Pages 579-591, ISSN 0927-0256
+    http://dx.doi.org/10.1016/j.commatsci.2014.07.056
+    - Forcefield developed for studying the influence of intrinsic point defects on the
+        chemistry with TiO2 condensed phases.
+    - Forcefield seems to be based on TiOCHNCl.ff, http://dx.doi.org/10.1557/jmr.2012.367
+    - Branch: water.
+
+
+LiSi.ff: (Li/Si)
+----------------
+A. Ostadhossein, E.D. Cubuk, G.A. Tritsaris, E. Kaxiras, S. Zhanga and A.C.T. van Duin
+    Stress effects on the initial lithiation of crystalline silicon nanowires: reactive
+        molecular dynamics simulations using ReaxFF
+    Phys. Chem. Chem. Phys., 2015,17, 3832-3840
+    http://dx.doi.org/10.1039/C4CP05198J
+    - Branch: combustion.
+
+
+CHOFeAlNiCuSCr.ff: (C/H/O/Fe/Al/Ni/Cu/S/Cr)
+-------------------------------------------
+Yun  K. Shin, H. Kwak, A.V. Vasenkov, D. Sengupta and A.C.T. van Duin
+    Development of a ReaxFF Reactive Force Field for Fe/Cr/O/S and Application to Oxidation
+        of Butane over a Pyrite-Covered Cr2O3 Catalyst
+    ACS Catalysis, 2015, 5 (12), pp 7226-7236
+    http://dx.doi.org/10.1021/acscatal.5b01766
+    - Forcefield optimized for Fe/Cr/O/S
+    - Branch: water.
+
+
+CHOFeAlNiCuSCr_v2.ff: (C/H/O/Fe/Al/Ni/Cu/S/Cr) Ni-O-vacancy
+-----------------------------------------------------------
+C. Zou et al.
+    Molecular dynamics simulations of the effects of vacancies on nickel self-diffusion,
+        oxygen diffusion and oxidation initiation in nickel, using the ReaxFF reactive
+        force field
+    Acta Materialia, Volume 83, 15 January 2015, Pages 102-112
+    http://dx.doi.org/10.1016/j.actamat.2014.09.047
+    - Forcefield optimized for Ni/O, trained with a QM data on Ni, NiO and vacancies
+    - The non-carbon parameters are the same as in CHOFeAlNiCuSCr_v3.ff
+    - Branch: water.
+
+
+CHOFeAlNiCuSCr_v3.ff: (C/H/O/Fe/Al/Ni/Cu/S/Cr)
+----------------------------------------------
+F. Tavazza, T.P. Senftle, C. Zou, C.A. Becker and A.C.T van Duin
+    Molecular Dynamics Investigation of the Effects of Tip-Substrate Interactions during
+        Nanoindentation
+    J. Phys. Chem. C, 2015, 119 (24), pp 13580-13589
+    http://dx.doi.org/10.1021/acs.jpcc.5b01275
+    - Combination of the C.ff (condensed carbon) forcefield with Ni/C/O/H parameters
+    - The non-carbon parameters are the same as in CHOFeAlNiCuSCr_v2.ff
+    - Branch: water.
+
+
+C.ff: (C) C-2013
+--------------------------
+S.G. Srinivasan, A.C.T. van Duin and P. Ganesh
+    Development of a ReaxFF Potential for Carbon Condensed Phases and Its Application to the
+        Thermal Fragmentation of a Large Fullerene
+    J. Phys. Chem. A, 2015, 119 (4), pp 571-580
+    http://dx.doi.org/10.1021/jp510274e
+    - Forcefield designed for modeling Carbon condensed phases
+    - Branch: combustion.
+
+
+CHONSSiGe.ff: (C/H/O/N/S/Si/Ge)
+-------------------------------
+G. Psofogiannakis and A.C.T van Duin
+    Development of a ReaxFF reactive force field for Si/Ge/H systems and application to
+        atomic hydrogen bombardment of Si, Ge, and SiGe (100) surfaces
+    Surface Science 2016, Vol. 646, pp 253-260
+    http://dx.doi.org/10.1016/j.susc.2015.08.019
+    - Forcefield designed for bombardment of Si, Ge and SiGe surfaces with atomic hydrogen.
+    - Branch: combustion.
+
+
+CHONSFPtClNi.ff: (C/H/O/N/S/F/Pt/Cl/Ni) Water-Pt-Ni-Nafion
+----------------------------------------------------------
+D. Fantauzzi, J.E. Mueller, L. Sabo, A.C.T. van Duin and T. Jacob
+    Surface Buckling and Subsurface Oxygen: Atomistic Insights into the Surface Oxidation
+        of Pt(111)
+    ChemPhysChem, 2015, Vol.16: 2797-2802
+    http://dx.doi.org/10.1002/cphc.201500527
+    - extension of the OPt.ff forcefield parameters
+    - Branch: water.
+
+
+CHONSSiPtZrNiCuCoHeNeArKrXe.ff: (C/H/O/N/S/Si/Pt/Zr/Ni/Cu/Co/He/Ne/Ar/Kr/Xe)
+----------------------------------------------------------------------------
+A.M. Kamat, A.C.T. van Duin and A. Yakovlev
+    Molecular Dynamics Simulations of Laser-Induced Incandescence of Soot Using an Extended
+        ReaxFF Reactive Force Field
+    J. Phys. Chem. A, 2010, 114 (48), pp 12561-12572
+    http://dx.doi.org/10.1021/jp1080302
+    - forcefield designed for the study of Laser-induced incandescense of soot
+    - Branch: combustion.
+
+
+CHOSFClN.ff: (C/H/O/S/F/Cl/N)
+-----------------------------
+M.A. Wood, A.C.T. van Duin and A. Strachan
+    Coupled Thermal and Electromagnetic Induced Decomposition in the Molecular Explosive
+        alpha-HMX; A Reactive Molecular Dynamics Study
+    J. Phys. Chem. A, 2014, 118 (5), pp 885-895
+    http://dx.doi.org/10.1021/jp406248m
+    - forcefield designed for studying the combustion of the high-energy material a-HMX
+    - Branch: combustion.
+
+
+Mue2016.ff: (C/H/O/S)
+---------------------
+Julian Mueller and Bernd Hartke
+    ReaxFF Reactive Force Field for Disulfide Mechanochemistry,
+        Fitted to Multireference ab Initio Data;
+    J. Chem. Theory Comput. 2016, 12, 8, 3913–3925
+    http://dx.doi.org/10.1021/acs.jctc.6b00461
+    - forcefield for studying S-S bond ruptures in mechanophores
+        upon mechanical stress. Ambient conditions, both in gas phase
+        and toluene solvent.
+    - Branch: combustion.
+
+
+CBN.ff: (C/H/B/N)
+-----------------
+Sung Jin Pai, Byung Chul Yeoa and Sang Soo Han 
+    Reactive force field for the improved design of
+        liquid CBN hydrogen storage materials
+    Phys. Chem. Chem. Phys., 2016, 18, pp 1818-1827
+    http://dx.doi.org/10.1039/C5CP05486A
+    - forcefield for studying liquid CBN (carbon-boron-nitrogen)
+        hydrogen-storage materials.
+    - Branch: combustion.
+
+
+AgZnO.ff: (C/H/O/N/Si/Cu/Ag/Zn)
+-------------------------------
+A. Lloyd, D. Cornil, A.C.T. van Duin, D. van Duin, R. Smith, S.D. Kenny,
+        J. Cornil and D. Beljonne
+    Development of a ReaxFF potential for Ag/Zn/O and application to Ag
+        deposition on ZnO
+    Surface Science, 2016, 645, pp 67-73    
+    http://dx.doi.org/10.1016/j.susc.2015.11.009
+    - ReaxFF potential for Ag/Zn/O used to study Ag
+        deposition on ZnO.
+    - Branch: water.
+
+
+AlCHO.ff: (Al/C/H/O)
+--------------------
+Sungwook Hong and Adri C. T. van Duin
+    Atomistic-Scale Analysis of Carbon Coating and
+        Its Effect on the Oxidation of Aluminum Nanoparticles
+        by ReaxFF-Molecular Dynamics Simulations
+    J. Phys. Chem. C, 2016, 120 (17), pp 9464-9474
+    http://dx.doi.org/10.1021/acs.jpcc.6b00786
+    - ReaxFF potential for Al/C interactions.
+          Used to investigate carbon coating and its effect
+          on the oxidation of aluminum nanoparticles (ANPs)
+    - Branch: water.
+
+
+CHNa.ff: (C/H/Na)
+-----------------
+E. Hjertenaes, A.Q. Nguyen and H. Koch
+    A ReaxFF force field for sodium intrusion
+        in graphitic cathodes
+    Phys. Chem. Chem. Phys., 2016, 18, pp 31431-31440
+    http://dx.doi.org/10.1039/C6CP06774C
+    - The force field is applied in hybrid grand canonical
+          Monte Carlo-molecular dynamics (GC-MC/MD) simulations
+          of model systems representative of sodium intrusion
+          in graphitic carbon cathodes used in aluminium electrolysis.
+    - Branch: combustion.
+
+
+CuBTC.ff: (C/H/O/N/S/Mg/P/Na/Cu)
+--------------------------------
+L. Huang, T. Bandosz, K. L. Joshi, A. C. T. van Duin and K. E. Gubbins
+    Reactive adsorption of ammonia and ammonia/water
+        on CuBTC metal-organic framework:
+        A ReaxFF molecular dynamics simulation
+    J. Chem. Phys., 2013, 138, 034102
+    http://dx.doi.org/10.1063/1.4774332
+    - The force field was used to study reactive adsorption of NH3
+        on the dehydrated CuBTC metal-organic framework.
+    - Branch: water.
+
+
+CHONSMgPNaTiClFAu.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F/Au)
+----------------------------------------------------
+Susanna Monti, Vincenzo Carravetta, and Hans Ågren
+    Simulation of Gold Functionalization with Cysteine by Reactive Molecular Dynamics
+    J. Phys. Chem. Lett., 2016, 7 (2), pp 272-276
+    http://dx.doi.org/10.1021/acs.jpclett.5b02769
+    - The force field was designed to study gold-protein interactions in water.
+
+
+HOSiAlLi.ff: (H/O/Si/Al/Li)
+---------------------------
+Alireza Ostadhossein, Sung-Yup Kim, Ekin D. Cubuk, Yue Qi, and Adri C. T. van Duin
+    Atomic Insight into the Lithium Storage and Diffusion Mechanism of SiO2/Al2O3 Electrodes
+        of Lithium Ion Batteries: ReaxFF Reactive Force Field Modeling
+    J. Phys. Chem. A, 2016, 120 (13), pp 2114-2127
+    http://dx.doi.org/10.1021/acs.jpca.5b11908
+    - Developed for studying the energetics and kinetics of lithiation, as well as 
+        Li transportation within the crystalline/amorphous silica and alumina phases.
+
+
+CHArHeNeKr.ff: (C/H/Ar/He/Ne/Kr)
+--------------------------------
+Kichul Yoon, A. Rahnamoun, J.L. Swett, V. Iberi, D.A. Cullen, I.V. Vlassiouk, A. Belianinov,
+        S. Jesse, X. Sang, O.S. Ovchinnikova, A.J. Rondinone, R.R. Unocic, and A.C.T. van Duin
+    Atomistic-Scale Simulations of Defect Formation in Graphene under Noble Gas Ion 
+        Irradiation
+    ACS Nano, 2016, 10 (9), pp 8376-8384
+    http://dx.doi.org/10.1021/acsnano.6b03036
+    - Developed for studying noble gas ion irradiation of graphene and the
+        subsequent effects of annealing. Lattice defects including nanopores were generated.
+
+
+CHO-radiation.ff: (C/H/O)
+-------------------------
+Roger Smith, K. Jolley, C. Latham, M. Heggie, A van Duin, D. van Duin, Houzheng Wu
+    A ReaXFF carbon potential for radiation damage studies
+    Nuclear Instruments and Methods in Physics Research Section B: Beam Interactions with
+        Materials and Atoms, Volume 393, 15 February 2017, Pages 49-53,
+    http://dx.doi.org/10.1016/j.nimb.2016.11.007
+    - Developed forcefield reproduces the formation energies of many of the defects predicted
+        by the ab initio calculations of energetic impacts and collision cascades in graphite.
+    - Forcefield reproduces the formation energies of many of the defects predicted by the ab
+        initio calculations and the energy pathways between different defect states, which
+        are important for investigating long term defect evolution.
+
+
+HOTiPd.ff: (H/O/Ti/Pd)
+----------------------
+Rafik Addou, T.P. Senftle, N. O'Connor, M.J. Janik, A.C.T. van Duin, and M. Batzill
+    Influence of Hydroxyls on Pd Atom Mobility and Clustering on Rutile TiO2(011)-2 x 1
+    ACS Nano, 2014, 8 (6), pp 6321-6333
+    http://dx.doi.org/10.1021/nn501817w
+    - Developed for MC simulations of Pd on TiO2 surfaces.
+
+
+CHONSMgPNaFBLi-e.ff: (C/H/O/N/S/Mg/P/Na/F/B/Li/El/Ho)
+-----------------------------------------------------
+M. Islam and A.C.T van Duin
+    Reductive Decomposition Reactions of Ethylene Carbonate by Explicit Electron Transfer
+        from Lithium: An eReaxFF Molecular Dynamics Study
+    J. Phys. Chem. C, 2016, 120 (48), pp 27128-27134
+    http://dx.doi.org/10.1021/acs.jpcc.6b08688
+    - This forcefield uses the ACKS2 charge model
+    - This forcefield is an eReaxFF forcefield
+    - Developed for the study of lithium-ion batteries
+    - NOTE: This ff uses vpar(38) for e-reaxff taper radius instead of vpar(41) that ADF-reaxff expects.
+        This will generate a warning but should still work.
+
+
+CHOFeAlNiCuSCrSiGe.ff: (C/H/O/Fe/Al/Ni/Cu/S/Cr/Si/Ge)
+-----------------------------------------------------
+Y. Zheng, S. Hong, G. Psofogiannakis, S. Datta, B. Rayner, A.C.T. van Duin and 
+        R. Engel-Herbert
+    Modeling and In-situ Probing of Surface Reactions in Atomic Layer Deposition
+    ACS Appl. Mater. Interfaces, 2017, 9 (18), pp 15848-15856
+    http://dx.doi.org/10.1021/acsami.7b01618
+    - Used for studying the ALD process of Al2O3 from trimethylaluminum and water on
+        hydrogenated and oxidized Ge(100) surfaces
+
+
+Water2017.ff: (H/O/X)
+---------------------
+W. Zhang, A.C.T. van Duin
+    Second-Generation ReaxFF Water Force Field: Improvements in the Description of Water 
+        Density and OH-Anion Diffusion
+    J. Phys. Chem. B, 2017, 121 (24), pp 6021–6032
+    http://dx.doi.org/10.1021/acs.jpcb.7b02548
+    - Better description of liquid water
+
+
+HSMo.ff: (H/S/Mo)
+-----------------
+A. Ostadhossein, A. Rahnamoun, Y. Wang, P. Zhao, S. Zhang, V.H. Crespi, and A.C.T. van Duin
+    ReaxFF Reactive Force-Field Study of Molybdenum Disulfide (MoS2)
+    J. Phys. Chem. Lett., 2017, 8 (3), pp 631–640
+    http://dx.doi.org/10.1021/acs.jpclett.6b02902
+    - MoS2 training set in supporting info
+    - strain-stress analysis
+
+
+CHON2017_weak.ff: (C/H/O/N/S/Mg/P/Na/Cu/Cl/X)
+---------------------------------------------
+Weiwei Zhang and Adri C. T. van Duin
+    Improvement of the ReaxFF Description for Functionalized Hydrocarbon/Water Weak
+        Interactions in the Condensed Phase
+    J. Phys. Chem. B, 2018, 122, 4083−4092
+    http://dx.doi.org/10.1021/acs.jpcb.8b01127
+    - retraining of the protein-2013 force-field (C, H, O, and N parameters for weak 
+        interactions)
+    - reproduces well the density of liquid water and hydrocarbons 
+
+
+CaSiOH.ff: (C/H/O/Ca/Si/X)
+--------------------------
+Hegoi Manzano, Roland J. M. Pellenq, Franz-Josef Ulm, Markus J Buehler, and A.C.T. van Duin
+    Hydration of Calcium Oxide Surface Predicted by Reactive Force Field Molecular Dynamics
+    Langmuir, 2012, 28 (9), 4187-4197
+    http://dx.doi.org/10.1021/la204338m
+    - hydration of calcium oxide surface
+    - fitted using density functional theory calculations on gas phase calcium–water clusters,
+        calcium oxide bulk and surface properties, calcium hydroxide, bcc and fcc Ca, 
+        and proton transfer reactions in the presence of calcium.
+
+
+CHO-2016.ff: (C/H/O)
+--------------------
+Chowdhury Ashraf and Adri C.T. van Duin*
+    Extension of the ReaxFF Combustion Force Field toward Syngas Combustion and Initial 
+        Oxidation Kinetics
+    J. Phys. Chem. A  121, 5, 1051-1068
+    https://dx.doi.org/10.1021/acs.jpca.6b12429
+    - improved description of oxidation of small hydrocarbons and syngas reaction
+
+
+CHON2017_weak_bb.ff: (C/H/O/N/S/Mg/P/Na/Cu/Cl/X)
+------------------------------------------------
+Vashisth A., Ashraf C., Zhang W., Bakis C.E., van Duin A.C.T.
+    Accelerated ReaxFF Simulations for Describing the Reactive Cross-Linking of Polymers
+    J Phys Chem A. 2018 Aug 1. 
+    https://doi.org/10.1021/acs.jpca.8b03826
+    - reparametrized version of CHON2017_weak.ff for bond-boost application
+
+
+CH_aromatics.ff: (C/H)
+----------------------
+Qian Mao, Yihua Ren,   K. H. Luo, Adri C. T. van Duin
+    Dynamics and kinetics of reversible homo-molecular dimerization of polycyclic aromatic 
+        hydrocarbons
+    The Journal of Chemical Physics 147, 244305 (2017)
+    https://doi.org/10.1063/1.5000534
+    - ff for polycyclic aromatic hydrocarbons
+
+
+CuSCH.ff: (C/H/O/S/Cu/Cl/X)
+---------------------------
+Jejoon Yeon, H.L. Adams, C.E. Junkermeier, A.C.T. van Duin, W.T. Tysoe, and A. Martini
+    Development of a ReaxFF Force Field for Cu/S/C/H and Reactive MD Simulations of Methyl 
+        Thiolate Decomposition on Cu (100)
+    J. Phys. Chem. B, 2018, 122 (2), pp 888–896
+    https://doi.org/10.1021/acs.jpcb.7b06976
+    - combination of CuCl-H2O.ff and AuSCH_2011.ff
+    - reparametrized Cu-S parameters with copper sulfides data
+
+
+TiO2bio.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F/X)
+-----------------------------------------
+Susanna Monti, Mariachiara Pastore, Cui Li, Filippo De Angelis, and Vincenzo Carravetta
+    Theoretical Investigation of Adsorption, Dynamics, Self-Aggregation, and Spectroscopic 
+        Properties of the D102 Indoline Dye on an Anatase (101) Substrate
+    J. Phys. Chem. C, 2016, 120 (5), pp 2787–2796
+    https://doi.org/10.1021/acs.jpcc.5b11332
+
+
+CHFe.ff: (C/H/Fe)
+-----------------
+Md Mahbubul Islam, Chenyu Zou, Adri C. T. van Duin  and  Sumathy Raman
+    Interactions of hydrogen with the iron and iron carbide interfaces: a ReaxFF molecular 
+        dynamics study
+    Phys. Chem. Chem. Phys., 2016, 18, 761-771 
+    https://doi.org/10.1039/C5CP06108C
+
+
+CHOGe.ff: (C/H/O/Ge)
+-------------------
+Nadire Nayir, Adri C.T. van Duin and Sakir Erkoc
+    Development of a ReaxFF Reactive Force Field for Interstitial Oxygen in Germanium and Its 
+        Application to GeO2/Ge Interfaces
+    J. Phys. Chem. C, 2019, 123 (2), pp 1208–1218
+    http://dx.doi.org/10.1021/acs.jpcc.8b08862
+    - Created by extending the training set from CHOFeAlNiCuSCrSiGe.ff by Zheng et al. with 
+        additional crystal data
+    - Some general parameters were missing in the Supporting Information
+
+
+CHONSSi.ff: (C/H/O/N/S/Si)
+--------------------------
+F.A. Soria, W. Zhang, P.A. Paredes-Olivera, A.C.T. van Duin and E.M. Patrito
+    Si/C/H ReaxFF Reactive Potential for Silicon Surfaces Grafted with Organic Molecules
+    J. Phys. Chem. C, 2018, 122 (41), pp 23515–23527
+    http://dx.doi.org/10.1021/acs.jpcc.8b07075
+    - developed for the study of the functionalization and decomposition of alkyl monolayers 
+        on silicon surface
+
+
+CHOSiNa.ff: (C/H/O/Si/Na)
+-------------------------
+S.H. Hahn, J. Rimsza, L. Criscenti, Wei Sun, Lu Deng, Jincheng Du, Tao Liang, S.B. Sinnott, 
+        and A.C.T. van Duin
+    Development of a ReaxFF Reactive Force Field for NaSiOx/Water Systems and Its Application
+        to Sodium and Proton Self-Diffusion
+    J. Phys. Chem. C, 2018, 122 (34), pp 19613–19624
+    https://dx.doi.org/10.1021/acs.jpcc.8b05852
+    - developed for reactive MD simulation of the sodium silicate–water interfaces
+    - validated for sodium silicate crystal structures and glasses, and transport properties 
+        of sodium ions and protons within the amorphous structures
+
+
+CHOCsKNaClIFLi.ff: (C/H/O/Cs/K/Na/Cl/I/F/Li)
+--------------------------------------------
+M.V. Fedkin, Yun  K. Shin, N. Dasgupta, Jejoon Yeon, W. Zhang, D. van Duin, A.C.T. van Duin, 
+        K. Mori, A. Fujiwara, M. Machida, H. Nakamura, and M. Okumura
+    Development of the ReaxFF Methodology for Electrolyte–Water Systems
+    J. Phys. Chem. A, 2019, 123 (10), pp 2125–2141
+    http://dx.doi.org/10.1021/acs.jpca.8b10453
+    - developed for water–electrolyte systems with Li+, Na+, K+, Cs+, F-, Cl-, and I-
+    - trained against (QM) calculations related to water binding energies, hydration energies 
+        and energies of proton transfer
+
+
+CHON-2019.ff: (C/H/O/N)
+-----------------------
+M. Kowalik, C. Ashraf, B. Damirchi, D. Akbarian, S. Rajabpour, and A.C.T. van Duin
+    Atomistic Scale Analysis of the Carbonization Process for C/H/O/N-Based Polymers 
+        with the ReaxFF Reactive Force Field
+    J. Phys. Chem. B, 2019, 123 (25), pp 5357-5367
+    https://doi.org/10.1021/acs.jpcb.9b04298
+    - improved force field for C/H/O/N chemistry based on DFT data with focus on 
+        N2 formation kinetics and its interactions with polymer-associated radicals 
+        formed during the carbonization process.
+    - study of polymer (PAN, PBO) conversion to graphite
+    - the original ff contained NaNs for all the 19th atomic parameters, replaced woth 0 here
+
+
+CuZr.ff: (Cu/Zr)
+----------------
+H.S. Huang, L.Q. Ai, A.C.T. van Duin, M. Chen, and Y. J. Lu
+    ReaxFF reactive force field for molecular dynamics simulations of liquid Cu and Zr metals
+    J. Chem. Phys. 151, 094503 (2019)
+    https://doi.org/10.1063/1.5112794
+    - developed for MD on thermophysical properties of liquid Cu and Zr metals
+    - Optimized by fitting to DFT calc. on equations of state for bulk crystal structures 
+        and surface energies
+    - represents structural characteristics and diffusion behaviors of elemental Cu and Zr up
+        to high-temperature liquid regions.
+
+
+ZrYOHVac.ff: (Zr/Y/O/H)
+-----------------------
+A.D. Mayernick, M. Batzill, A.C.T. van Duin, and M.J. Janika
+    A reactive force-field (ReaxFF) Monte Carlo study of surface enrichment and step structure
+        on yttria-stabilized zirconia
+    Surface Science 2010, 604, 17–18, pp 1438-1444
+    https://doi.org/10.1016/j.susc.2010.05.006
+    - Designed to investigate surface segregation in yttria-stabilized zirconia (YSZ)
+    - Parameterized with DFT energies describing surface energy as a function of yttrium 
+        lattice position
+    - used for MC simulated annealing to sample structural configurations of flat YSZ (111)
+        and vicinal YSZ (111) stepped surfaces
+
+
+Ag-e.ff: (Av/El)
+----------------
+B. Evangelisti, K.A. Fichthorn and A.C.T. van Duin
+    Development and initial applications of an e-ReaxFF description of Ag nanoclusters
+    J. Chem. Phys. 153, 104106 (2020)
+    https://doi.org/10.1063/5.0018971
+    - This forcefield uses the ACKS2 charge model
+    - This forcefield is an eReaxFF forcefield
+    - Parameterized for Ag nanoclusters with 20 atoms or less
+    - accurately reproduces the 2D–3D transition observed between the Ag5 and Ag7 clusters
+
+
+ZrYONiH.ff: (Zr/Y/O/Ni/H)
+-------------------------
+Shu-Sheng Liu, L.C. Saha, A. Iskandarov, T. Ishimoto, T. Yamamoto, Y. Umeno, 
+        S. Matsumura and M. Koyama
+    Atomic structure observations and reaction dynamics simulations on triple phase boundaries in
+        solid-oxide fuel cells
+    Communications Chemistry volume 2, Article number: 48 (2019)
+    https://doi.org/10.1038/s42004-019-0148-x
+    - Forcefield developed for Triple Phase Boundary (TPB) metal, oxide and gas simulations
+    - Solid oxide fuel cell anode research
+
+
+CHONSi.ff: (C/H/O/N/Si)
+-----------------------
+Yang Wang, Yuqing Shi, Qiang Sun, Kang Lu, Momoji Kubo, and Jingxiang Xu
+    Development of a Transferable ReaxFF Parameter Set for Carbon- and Silicon-Based Solid Systems
+    J. Phys. Chem. C 2020, 124, 18, 10007–10015
+    https://doi.org/10.1021/acs.jpcc.0c01645
+    - Developed for the research of Carbon/Silicon-based solid lubricants
+    - Forcefield file was constructed from supporting information using OCR scanning, needs 
+        detailed checking for correctness!
+
+
+CuCHO.ff: (Cu/C/O/H)
+--------------------
+Wenbo Zhu, Hao Gong, You Han, Minhua Zhang, and A.C.T. van Duin
+    Development of a Reactive Force Field for Simulations on the Catalytic Conversion of C/H/O 
+        Molecules on Cu-Metal and Cu-Oxide Surfaces and Application to Cu/CuO-Based Chemical 
+        Looping
+    J. Phys. Chem. C 2020, 124, 23, 12512–12520
+    https://doi.org/10.1021/acs.jpcc.0c02573
+    - Developed for the Cu-metal surface catalysis system
+
+
+CHONSSiNaP-tribology.ff: (C/H/O/N/S/Si/Na/P)
+--------------------------------------------
+Da-Chuan Yue, Tian-Bao Ma, Yuan-Zhong Hu, Jejoon Yeon, A.C.T. van Duin, Hui Wang, &Jianbin Luo
+    Tribochemistry of Phosphoric Acid Sheared between Quartz Surfaces: A Reactive Molecular
+        Dynamics Study
+    J. Phys. Chem. C 2013, 117, 48, 25604–25614
+    http://dx.doi.org//10.1021/jp406360u
+    - Designed for studying friction coefficients in the silica/phosphoric acid system
+    - based on Quenneville et al. JPC-C 2010 and Si/O/H: Fogarty et al. JCP-2010
+
+
+SiOHv2.ff: (Si/O/H)
+-------------------
+Nadire Nayir, A.C.T. van Duin and Sakir Erkoc
+    Development of the ReaxFF Reactive Force Field for Inherent Point Defects in the
+        Si/Silica System
+    J. Phys. Chem. A 2019, 123, 19, 4303–4313
+    https://doi.org/10.1021/acs.jpca.9b01481
+    - The supporting information was missing 3 general parameters, these have been filled in
+        using the 2010 Fogarty et al. forcefield SiOH.ff
+    - Redeveloped parameters for Si/O/H interactions, based on Fogarty et al. 2010
+    - enables MD simulations of Si/SiO2 interfaces and O diffusion in bulk Si at high temps,
+        in particular with respect to point defect stability and migration.
+
+
+CHONSZr.ff: (C/H/O/N/S/Zr)
+--------------------------
+S. Dwivedi, M. Kowalik, N. Rosenbach, D.S. Alqarni, Yun K. Shin, Yongjian Yang, J.C. Mauro,
+        A. Tanksale, A.L. Chaffee, and A.C.T. van Duin
+    Atomistic Mechanisms of Thermal Transformation in a Zr-Metal Organic Framework, MIL-140C
+    J. Phys. Chem. Lett. 2021, 12, 1, 177–184
+    https://doi.org/10.1021/acs.jpclett.0c02930
+    - Developed for studying thermal decomposition of a Zr-MOF (MIL-140C) using MD
+
+
+CHONSMgPNaTiClFKLi.ff: (C/H/O/N/S/Mg/P/Na/Ti/Cl/F/K/Li)
+-------------------------------------------------------
+K. Ganeshan, Yun K. Shin, N.C. Osti, Yangyunli Sun, K. Prenger, M. Naguib, M. Tyagi, 
+        E. Mamontov, De-en Jiang, and A.C.T. van Duin
+    Structure and Dynamics of Aqueous Electrolytes Confined in 2D-TiO2/Ti3C2T2 MXene 
+        Heterostructures
+    ACS Appl. Mater. Interfaces 2020, 12, 52, 58378–58389
+    https://doi.org/10.1021/acsami.0c17536
+    - Developed for exploring the heterostructure of 2D lepidocrocite-type TiO2 (2D-TiO2)
+        and hydroxylated or O-terminated Ti3C2 MXene in aqueous electrolytes using MD
+        simulations and elastic/quasielastic neutron scattering techniques.
+
+
+CeO.ff: (Ce/O)
+--------------
+P. Broqvist, J. Kullgren, M.J. Wolf, A.C.T. van Duin, and K. Hermansson
+    ReaxFF Force-Field for Ceria Bulk, Surfaces, and Nanoparticles
+    The Journal of Physical Chemistry C, 119(24), 13598-13609
+    https://doi.org/10.1021/acs.jpcc.5b01597
+    - Developed for stoichiometric ceria (CeO2) and partially reduced ceria (CeO2–x)
+    - Usage: The parameters have been tested for static calculations of CeO2 and partially 
+        reduced CeO(2-x). For energy comparisons, use the in-cell approach (see the paper) 
+        when calculating reaction energies
+    - Warning: Note that elemental potentials taken from alloy descriptions may not work well
+        for the pure species. This is particularly true if the elements were fit for compounds
+        instead of being optimized separately. As with all interatomic potentials, please 
+        check to make sure that the performance is adequate for your problem.
+    - Note from authors: After publication, we have found additional false local minima. In
+        particular one involving a short Ce-O bond (approx. 1.89 Ã…) occuring in partially 
+        reduced ceria systems. This  is problematic as it gives the wrong dynamic behavior. 
+        Attempts to heal this deficiency so far destroys the good performance regarding the 
+        ordering of the surface vacancy energies on the (111) surface. Therefore, keep track 
+        of the bond distances when analysing your results!  
+
+
+InCH-2020.ff: (C/H/In)
+----------------------
+S. Rajabpour, Qian Mao, N. Nayir, J. A. Robinson, and A. C. T. van Duin
+    Development and Applications of ReaxFF Reactive Force Fields for Group-III Gas-Phase 
+        Precursors and Surface Reactions with Graphene in Metal–Organic Chemical Vapor 
+        Deposition Synthesis
+    J. Phys. Chem. C 2021, 125, 19, 10747–10758
+    https://doi.org/10.1021/acs.jpcc.1c01965
+    - Developed to investigate the MOCVD gas-phase reactions of Ga and In film growth 
+        from trimethylgallium (TMGa) and trimethylindium (TMIn) precursors, respectively, 
+        and the surface interactions of TMGa and TMIn with graphene.
+
+
+GaCH-2020.ff: (C/H/Ga)
+----------------------
+S. Rajabpour, Qian Mao, N. Nayir, J.A. Robinson, and A.C.T. van Duin
+    Development and Applications of ReaxFF Reactive Force Fields for Group-III Gas-Phase 
+        Precursors and Surface Reactions with Graphene in Metal–Organic Chemical Vapor 
+        Deposition Synthesis
+    J. Phys. Chem. C 2021, 125, 19, 10747–10758
+    https://doi.org/10.1021/acs.jpcc.1c01965
+    - Developed to investigate the MOCVD gas-phase reactions of Ga and In film growth 
+        from trimethylgallium (TMGa) and trimethylindium (TMIn) precursors, respectively, 
+        and the surface interactions of TMGa and TMIn with graphene.
+
+
+HONSiF.ff: (H/O/N/Si/F)
+-----------------------
+D.H. Kim, S.J. Kwak, J.H. Jeong, S. Yoo, S.K. Nam, Y. Kim, and W.B. Lee
+    Molecular Dynamics Simulation of Silicon Dioxide Etching by Hydrogen Fluoride Using 
+        the Reactive Force Field
+    ACS Omega 2021, 6, 16009−16015
+    https://doi.org/10.1021/acsomega.1c01824
+    - Developed for a Si/O/H/F system to perform etching simulations of SiO2 with HF.
+
+
+CsPbI.ff: (I/Pb/Cs/X)
+---------------------
+M. Pols, J.M. Vicent-Luna, I. Filot, A.C.T. van Duin, and S. Tao
+    Atomistic Insights Into the Degradation of Inorganic Halide Perovskite CsPbI3: 
+        A Reactive Force Field Molecular Dynamics Study
+    J. Phys. Chem. Lett. 2021, 12, 5519−5525
+    https://doi.org/10.1021/acs.jpclett.1c01192
+    - Developed for molecular dynamics simulations of the phase instability and the 
+        defect-induced degradation in the CsPbI3 perovskite.
+
+
+CHOLiAlTiP.ff: (C/H/O/Li/Al/Ti/P)
+---------------------------------
+Yun  K. Shin, M.Y. Sengul, A.S.M. Jonayat, W. Lee, E.D. Gomez, C.A. Randall, and A.C.T. van Duin
+    Development of a ReaxFF reactive force field for lithium ion conducting solid 
+        electrolyte LiAlTi(PO4)3 (LATP)
+    Phys. Chem. Chem. Phys., 2018, 20, 22134-22147
+    https://doi.org/10.1039/C8CP03586E
+    - Developed for NASICON-type Li1+xAlxTi2−x(PO4)3 (LATP) materials, which is a 
+        promising solid-electrolyte that may enable all-solid-state lithium-ion batteries. 
+
+
+WSHAlO.ff: (W/S/H/Al/O)
+-----------------------
+N. Nayir, Yun  K. Shin, Y. Wang, M.Y. Sengul, D. Reifsnyder Hickey, M. Chubarov, T.H. Choudhury, 
+        N. Alem, J. Redwing, V.H. Crespi, and A.C.T. van Duin
+    A ReaxFF Force Field for 2D-WS2 and its Interaction with Sapphire
+    J. Phys. Chem. C 2021, 125, 17950−17961
+    https://doi.org/10.1021/acs.jpcc.1c03605
+    - Designed to capture the most essential features of a WS2 thin film, such as the 2H → 1T 
+        displacive phase transition, S-vacancy migration, and the energetics of various point 
+        and line defects, e.g., ripplocations in a WS2 monolayer.
+
+
+SiAlMgO.ff: (Si/Al/Mg/O)
+------------------------
+Jejoon Yeon, S.C. Chowdhury, C.M. Daksha, and J.W. Gillespie Jr.
+    Development of Mg/Al/Si/O ReaxFF Parameters for Magnesium Aluminosilicate Glass Using an 
+        Artificial Neural Network-Assisted Genetic Algorithm
+    J. Phys. Chem. C 2021, 125, 18380−18394
+    https://doi.org/10.1021/acs.jpcc.1c01190
+    - Developed to describe Mg/Al/Si/O interactions in S-glass and other magnesium 
+        aluminosilicate (MAS) glass compositions. 
+    - The training set includes the density functional theory data of the energy response 
+        of various Mg/Al/Si/O crystals during volumetric expansion and compression and Mg 
+        migration inside Mg/Al/Si/O crystals.
+
+
+CHOSMoNiLiBFPN-2.ff: (C/H/O/S/Mo/Ni/Li/B/F/P/N)
+-----------------------------------------------
+Yue Liu, Qintao Sun, Peiping Yu, Yu Wu, Liang Xu, Hao Yang, Miao Xie, Tao Cheng,
+        and W.A. Goddard III
+    Effects of High and Low Salt Concentrations in Electrolytes at Lithium–Metal Anode 
+        Surfaces Using DFT-ReaxFF Hybrid Molecular Dynamics Method
+    J. Phys. Chem. Lett. 2021, 12, 2922−2929
+    https://doi.org/10.1021/acs.jpclett.1c00279
+    - Extension of CHOSMoNiLiBFPN.ff with parameters for (fluorosulfonyl)imide anions.
+
+
+NiCr.ff: (Ni/Cr)
+----------------
+Yun K. Shin, Yawei Gao, Dongwon Shin, and A.C.T. van Duin
+    Impact of three-body interactions in a ReaxFF force field for Ni and Cr transition 
+        metals and their alloys on the prediction of thermal and mechanical properties
+    J. Phys. Chem. C 2021, 125, 17950−17961
+    https://doi.org/10.1021/acs.jpcc.1c03605
+    - After introducing three-body interaction parameters to the metal force field, ReaxFF 
+        can successfully predict experimental elastic constants of fcc Ni and bcc Cr at 
+        finite temperatures. 
+
+
+CHNOSSi.ff: (C/H/O/N/S/Si)
+--------------------------
+Markus J. Buehler, Adri C. T. van Duin, and William A. Goddard, III
+    Multiparadigm Modeling of Dynamical Crack Propagation in Silicon Using a Reactive Force 
+        Field
+    Phys. Rev. Lett. 2006, 96, 095505
+    https://doi.org/10.1103/PhysRevLett.96.095505
+    - Study of dynamic cracking in a silicon single crystal in which the ReaxFF reactive 
+        force field.
+
+
+CHONSSiGe_2016.ff: (C/H/O/N/S/Si/Ge)
+------------------------------------
+Jialin Wen, Tianbao Ma, Weiwei Zhang, George Psofogiannakis, Adri C. T. van Duin, Lei Chen, 
+        Linmao Qian, Yuanzhong Hu, Xinchun Lu
+    Atomic insight into tribochemical wear mechanism of silicon at the Si/SiO2 interface in 
+        aqueous environment: Molecular dynamics simulations using ReaxFF reactive force field
+    Appl. Surf. Sci., 2016, 390, 216-223
+    https://doi.org/10.1016/j.apsusc.2016.08.082
+    - Study of tribochemical wear of silicon at the Si/SiO2 interface in aqueous environment.
+
+
+RuNH.ff: (Ru/N/H)
+------------------------------------
+Sung-Yup Kim, Hong Woo Lee, Sung Jin Pai, and Sang Soo Han
+    Activity, Selectivity, and Durability of Ruthenium Nanoparticle Catalysts for Ammonia 
+        Synthesis by Reactive Molecular Dynamics Simulation: Size Effect
+    ACS Appl. Mater. Interfaces, 2018, 10, 31, 26188–26194
+    https://doi.org/10.1021/acsami.8b05070
+    - Study of ammonia synthesis from nitrogen and hydrogen over Ru nanoparticle
+    - During force-field fitting the following quantities were considered: 
+        equations of states of various Ru crystals, surface formation energies for various 
+        Ru surfaces, adsorption energies of N and H atoms on Ru surfaces, various reaction 
+        pathways (N2 dissociation, H diffusion, and NH3 formation) on Ru surfaces, 
+        and Ru–N and Ru–H bond dissociations in several nonperiodic systems.
+
+
+# Format of this file (max 95 chars wide!):
+#  |filename.ff: (Atom/Types/included) Optional title
+#  |-------------------------------------------------
+#  |Authors list
+#  |    Title of the publication that contains the forcefield
+#  |    Journal string, same way it is used in scm documentation
+#  |    http://dx.doi.org/doi-link-to-the-publication
+#  |    - Addtional info about the forcefield
+#  |    - for example: what type of simulation it was designed for, what kind of chemistry can
+#  |        be done with it, if it contains special things such as dispersion terms, etc.
+#  |
+#  |
+#  |nextfilename.ff:()
+# If a string does not fit on the line, it continues on the next line after 8 spaces.

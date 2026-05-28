@@ -1,0 +1,87 @@
+#################################剪切  Deform method ##########################
+variable fname index  xlink_final.data300K0.101MPa_Equ4NPT.restart                 #不同压力下的模型，和vPre的模型对应
+variable vShearstrain equal 1             #最终的应变，控制模拟时间 
+variable vPre equal 0.101         #单位MPa 常压1atm=0.101Mpa   改为0再试一下
+variable vPress equal ${vPre}*9.87  #压力 1MPa=9.87atm 
+variable vTimestep equal 1             #一般不需要改
+variable vFrestep equal 1000          #一般不需要改
+#variable vTenstep equal 90000
+##############----------------loop Temperature
+label loopTem
+variable vTemp index 300 #温度# desired temperature
+##############----------------loop Velocity
+label loopVel
+variable vVel index 1E-7 # 应变速度   #unit is 1/fs
+##############----------------
+shell mkdir Shear_def_${vTemp}_${vVel}
+shell cd Shear_def_${vTemp}_${vVel}
+##############----------------Initial----------------
+log Shear_def_${vTemp}_${vVel}.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+pair_style lj/class2/coul/cut 12.5 12.5
+#pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+#read_data ../${fname}.data
+read_restart ../${fname}
+#############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+#neigh_modify delay 5 check yes  #近邻表更新频率
+#####################################################
+# initial velocities
+timestep 1
+reset_timestep 0  #重设时间步为0
+#velocity all create ${vTemp} 5812775 dist gaussian loop geom
+##############----------------Temper controllers
+compute cTall all temp
+compute cTall1 all temp/partial 0 1 1 #0/1 for whether to exclude/include this dimension
+compute cPress all pressure thermo_temp
+compute pot_energy all pe/atom
+##############----------------Thermo
+thermo_style custom step temp press pe ke etotal lx ly lz pxy pxz pyz vol 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo 1000
+##############----------------shear in xy plane -------------------------------------
+change_box all triclinic
+variable tmpx equal lx
+variable tmpy equal ly
+variable tmpz equal lz
+variable L0x equal ${tmpx}
+variable L0y equal ${tmpy}
+variable L0z equal ${tmpz}
+# In units metal, pressure is in [bars]; sxz is in GPa    
+variable vShestep equal ${vShearstrain}/(${vVel})
+variable sxy equal (-pxy*1.01325)/10000         # calculate shear stress
+variable vStrain equal ${vVel}*step # calculate shear strain
+fix def1 all print 1000 "${vStrain} ${sxy}" file Stress-strain.txt screen no
+##############----------------Dump
+dump 1 all custom ${vFrestep} ${vTemp}K${vVel}Shear.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 element C N O C H H C O C C C C C S
+# deformation starts!
+#fix 1 all nve
+#fix 2 all temp/rescale 1 ${Temp} ${Temp} ${tdamp} 0.5
+fix 1 all npt temp ${vTemp} ${vTemp} 100 x ${vPress} ${vPress} 1000 y ${vPress} ${vPress} 1000 drag 0.2   #拉伸也是在npt系综下进行
+fix_modify 1 temp cTall1 press cPress
+fix 2 all deform 1 xy erate ${vVel} units box remap x
+run ${vShestep}
+write_data ${fname}Shedeform.data
+write_restart  ${fname}Shedeform.restart
+unfix 1
+unfix 2
+undump 1 
+#####################################################
+shell cd ../
+next vVel
+jump in.sheardeform.txt loopVel
+next vTemp
+jump in.sheardeform.txt loopTem
+print "All done"

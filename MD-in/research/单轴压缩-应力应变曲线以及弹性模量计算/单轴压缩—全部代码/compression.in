@@ -1,0 +1,73 @@
+#
+clear
+shell               mkdir output ./output/deformation ./output/equli ./output/data
+
+units               metal
+boundary            p p p
+atom_style          atomic
+timestep		    0.001
+neighbor            2.0 bin
+neigh_modify        delay 5 check yes
+
+read_data           Cu_Gr_new.data
+#--------------------------------- FORCE FIELD ------------------------------------
+#Cu-Cu  EAM potential
+#C-C    AIREBO potential
+#Cu-C   LJ potential
+
+pair_style          hybrid eam/alloy airebo 1.7 lj/cut 7.70625
+pair_coeff          * * eam/alloy Cu01.eam.alloy Cu NULL 
+pair_coeff          * * airebo CH.airebo NULL C
+pair_coeff          1 2 lj/cut 0.02578 3.0825
+#-------------------------------- SETTINGS ---------------------------------
+#compute             csym all centro/atom fcc
+#compute             peratom all pe/atom
+variable            T equal 10 
+#-------------------------------- Minimization -----------------------------
+#fix                 1 all box/relax iso 0.0 vmax 0.001
+min_style           cg
+minimize            1e-15 1e-15 10000 10000
+write_data          mini.data
+#-------------------------------- EQUILIBRATION ----------------------------
+#unfix               1
+reset_timestep      0
+timestep            0.001
+velocity            all create $T 12345 mom yes rot no loop local
+fix                 1 all npt temp $T $T 0.1 aniso 0 0 1 drag 1 
+
+thermo              1000
+thermo_style        custom step lx ly lz press pxx pyy pzz pe temp
+# Run for 60 picosecond (assuming 1 fs timestep)
+run                 60000
+unfix               1
+write_data          ./output/equli/equli.data
+write_restart		./output/data/equli.restart
+# Store final cell length for strain calculations
+variable            tmp equal "lz"
+variable            L0 equal ${tmp}
+print               "Initial Length, L0: ${L0}"
+#-------------------------------------- Deformation --------------------------------
+reset_timestep      0
+fix                 1 all npt temp $T $T 0.1 x 0 0 1 y 0 0 1 drag 1
+variable            srate equal 1.0e9
+variable            srate1 equal "-v_srate / 1.0e12"
+fix                 2 all deform 1 z erate ${srate1} units box remap x
+# Output strain and stress info to file
+# for units metal, pressure is in [bars] = 100 [kPa] = 1/10000 [GPa]
+# p2, p3, p4 are in GPa
+variable            strain equal "(v_L0 - lz)/v_L0"
+variable            p1 equal "v_strain"
+variable            p2 equal "pxx/10000"
+variable            p3 equal "pyy/10000"
+variable            p4 equal "pzz/10000"
+fix                 def1 all print 100 "${p1} ${p2} ${p3} ${p4}" file ./output/data/compress.txt screen no
+# set dumpfile for ovito
+dump                1 all custom 1000 ./output/deformation/compress.*.dump mass type x y z fx fy fz
+
+# Display thermo
+thermo              1000
+thermo_style        custom step v_strain temp v_p1 v_p2 v_p3 v_p4 ke pe press
+run                 200000
+#--------------------------------------- SIMULATION DONE ----------------------------------
+# 
+print               "All done"

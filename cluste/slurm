@@ -1,0 +1,160 @@
+# 1.munge源码安装  
+wget https://github.com/dun/munge/releases/download/munge-0.5.15/munge-0.5.15.tar.xz  
+mkdir -pv /opt/munge  
+tar xvJf munge-0.5.15.tar.xz  
+cd munge-0.5.15/  
+./bootstrap
+./configure --prefix=/opt/munge --bindir=/opt/munge/bin --sbindir=/opt/munge/sbin --sysconfdir=/opt/munge/etc --localstatedir=/opt/munge/var --with-runstatedir=/opt/munge/run --libdir=/opt/munge/lib --includedir=/opt/munge/include
+
+make -j && make install  
+# 添加环境变量  
+cat << \EOF > /etc/profile.d/munge_env.sh   
+export PATH="/opt/munge/bin:/opt/munge/sbin:$PATH"  
+EOF  
+source /etc/profile.d/munge_env.sh  
+
+# 创建用户  
+export MUNGEUSER=1120  
+groupadd -g $MUNGEUSER munge   
+useradd -m -c "MUNGE Uid 'N' Gid Emporium" -d /var/lib/munge -u $MUNGEUSER -g munge -s /sbin/nologin munge   
+
+# 更改文件夹权限  
+chown -R munge:munge /opt/munge  
+mkdir -pv /opt/munge/run/munge 
+chown -R munge:munge /opt/munge/run/munge 
+
+mungekey --verbose 
+chmod -R 600 /opt/munge/etc/munge/munge.key   
+
+ln -s /opt/munge/lib/systemd/system/munge.service /etc/systemd/system/munge.service  
+
+chown -R munge:munge /etc/systemd/system/munge.service 
+
+# 启动并设置开机自启  
+systemctl enable --now munge  
+
+# 2. 支持Power_Saving_Guide中所述实现省电  
+https://www.gnu.org/software/freeipmi/download.html  
+wget https://ftp.gnu.org/gnu/freeipmi/freeipmi-1.6.11.tar.gz  
+tar zxvf freeipmi-1.6.11.tar.gz   
+cd freeipmi-1.6.11/  
+yum install libgcrypt-devel texinfo  
+mkdir /opt/freeipmi  
+./configure --prefix=/opt/freeipmi --exec-prefix=/opt/freeipmi --sysconfdir=/opt/freeipmi/etc --localstatedir=/opt/freeipmi/var   
+make -j && make install  
+# 环境 
+cat << \EOF > /etc/profile.d/freeipmi_env.sh   
+export FREEIPMI_HOME=/opt/freeipmi  
+export PATH=$FREEIPMI_HOME/sbin:$PATH  
+export LD_LIBRARY_PATH=$FREEIPMI_HOME/lib:$LD_LIBRARY_PATHexport LD_LIBRARY_PATH=$FREEIPMI_HOME/lib/pkgconfig:$LD_LIBRARY_PATH  
+EOF  
+
+source /etc/profile.d/freeipmi_env.sh   
+
+# 3.编译支持openMPI  
+# - hwloc   可以显示CPU拓扑，比较方面地查看CPU各级缓存以及各个核、物理CPU之间，可以共享哪一级别的CPU cache  
+https://www.open-mpi.org/software/hwloc/v2.9/  
+wget https://download.open-mpi.org/release/hwloc/v2.9/hwloc-2.9.3.tar.gz  
+tar zxvf hwloc-2.9.3.tar.gz   
+cd hwloc-2.9.3/  
+mkdir -pv /opt/hwloc  
+./configure --prefix=/opt/hwloc/ 
+make -j && make install
+  
+cat << \EOF > /etc/profile.d/hwloc_env.sh   
+export HWLOC_HOME=/opt/hwloc
+export PATH=$HWLOC_HOME/bin:$PATH
+export PATH=$HWLOC_HOME/sbin:$PATH
+export LD_LIBRARY_PATH=$HWLOC_HOME/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$HWLOC_HOME/lib/pkgconfig:$LD_LIBRARY_PATH
+EOF
+source /etc/profile.d/hwloc_env.sh
+ 
+   
+# libevent  
+wget https://github.com/libevent/libevent/releases/download/release-2.1.12-stable/libevent-2.1.12-stable.tar.gz  
+tar zxvf  libevent-2.1.12-stable.tar.gz   
+cd libevent-2.1.12-stable/  
+mkdir /opt/libevent  
+./configure --prefix=/opt/libevent  
+make -j && make install  
+  
+cat << \EOF > /etc/profile.d/libevent_env.sh   
+cat /etc/profile.d/libevent_env.sh
+export LIBEVENT_HOME=/opt/libevent
+export PATH=$LIBEVENT_HOME/bin:$PATH
+export LD_LIBRARY_PATH=$LIBEVENT_HOME/lib:$LD_LIBRARY_PATH
+export LD_LIBRARY_PATH=$LIBEVENT_HOME/lib/pkgconfig:$LD_LIBRARY_PATH 
+EOF  
+  
+source /etc/profile.d/libevent_env.sh
+  
+# - pmix  
+wget https://github.com/openpmix/openpmix/releases/download/v4.2.8/pmix-4.2.8.tar.gz  
+tar zxvf pmix-4.2.8.tar.gz   
+mkdir -pv /opt/pmix  
+cd pmix-4.2.8/  
+./configure --prefix=/opt/pmix --with-libevent=/opt/libevent --with-libevent=/opt/libevent --with-hwloc=/opt/hwloc --with-munge=/opt/munge --with-munge-libdir=/opt/munge/lib
+
+make -j && make install  
+  
+cat << \EOF > /etc/profile.d/pmix_env.sh   
+export PMIX_HOME=/opt/pmix  
+export PATH=$PMIX_HOME/bin:$PATH  
+export LD_LIBRARY_PATH=$PMIX_HOME/lib:$LD_LIBRARY_PATH  
+export LD_LIBRARY_PATH=$PMIX_HOME/lib/pmix:$LD_LIBRARY_PATH  
+export LD_LIBRARY_PATH=$PMIX_HOME/lib/pkgconfig:$LD_LIBRARY_PATH  
+EOF  
+
+source /etc/profile.d/pmix_env.sh   
+ 
+# - ucx  
+wget https://github.com/openucx/ucx/releases/download/v1.15.0/ucx-1.15.0.tar.gz  
+tar zxvf ucx-1.15.0.tar.gz   
+cd ucx-1.15.0/  
+mkdir /opt/ucx  
+./configure --prefix=/opt/ucx  
+make -j && make install  
+  
+117cat << \EOF > /etc/profile.d/ucx_env.sh   
+118export UCX_HOME=/opt/ucx  
+119export PATH=$UCX_HOME/bin:$PATH  
+120export LD_LIBRARY_PATH=$UCX_HOME/lib:$LD_LIBRARY_PATH  
+121export LD_LIBRARY_PATH=$UCX_HOME/lib/ucx:$LD_LIBRARY_PATH  
+122export LD_LIBRARY_PATH=$UCX_HOME/lib/pkgconfig:$LD_LIBRARY_PATH  
+123EOF  
+124source /etc/profile.d/ucx_env.sh   
+125  
+126- openmpi  
+127wget https://download.open-mpi.org/release/open-mpi/v4.1/openmpi-4.1.6.tar.gz  
+128tar  zxvf openmpi-4.1.6.tar.gz   
+129cd openmpi-4.1.6/  
+130mkdir /opt/openmpi  
+131./configure --prefix=/opt/openmpi --with-libevent=/opt/libevent --with-hwloc=/opt/hwloc --with-pmix=/opt/pmix  --with-ucx=/opt/ucx   
+132make -j2 && make install  
+133  
+134cat << \EOF > /etc/profile.d/openmpi_env.sh   
+135export OPENMPI_HOME=/opt/openmpi  
+136export PATH=$OPENMPI_HOME/bin:$PATH  
+137export LD_LIBRARY_PATH=$OPENMPI_HOME/lib:$LD_LIBRARY_PATH  
+138export LD_LIBRARY_PATH=$OPENMPI_HOME/lib/openpmi:$LD_LIBRARY_PATH  
+139export LD_LIBRARY_PATH=$OPENMPI_HOME/lib/pkgconfig:$LD_LIBRARY_PATH  
+140EOF  
+141source /etc/profile.d/openmpi_env.sh   
+142  
+143# 4. 编译slurm  
+144wget https://download.schedmd.com/slurm/slurm-23.11.1.tar.bz2  
+145tar xvjf slurm-23.11.1.tar.bz2   
+146yum install -y python3 readline-devel  hwloc-devel ucx-devel freeipmi-devel pam-devel http-parser-devel json-c-devel perl-ExtUtils-MakeMaker perl-Switch  lua-devel  
+147cd slurm-23.11.1/  
+148./configure --prefix=/opt/slurm --bindir=/opt/slurm/bin --sbindir=/opt/slurm/sbin --sysconfdir=/opt/slurm/etc --runstatedir=/opt/slurm/run  --libdir=/opt/slurm/lib  --includedir=/opt/slurm/include --with-pmix=/opt/pmix --with-hwloc=/opt/hwloc --with-ucx=/opt/ucx --with-freeipmi=/opt/freeipmi  
+149make -j4 && make install   
+150  
+151cat << \EOF > /etc/profile.d/slurm_env.sh  
+152export SLURM_HOME=/opt/slurm  
+153export PATH=$SLURM_HOME/bin:$PATH  
+154export PATH=$SLURM_HOME/sbin:$PATH  
+155export LD_LIBRARY_PATH=$SLURM_HOME/lib:$LD_LIBRARY_PATH  
+156export LD_LIBRARY_PATH=$SLURM_HOME/lib/slurm:$LD_LIBRARY_PATH  
+157EOF  
+158source /etc/profile.d/slurm_env.sh

@@ -1,0 +1,97 @@
+# Python
+.venv/
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE
+.idea/
+.vscode/
+
+# 历史备份
+.history/
+
+# 仿真输出文件
+*.data
+*.lammpstrj
+*.lammps
+*.restart
+*.xyz
+*.lammpsstrjD
+log.lammps
+*.log
+log.*.txt
+*.bak
+*.out
+
+# GAP 数据集
+data[0-9]*
+
+# 较大的输出/中间文件
+*.2d
+*.reax
+*.xsd
+
+# 图片/媒体
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.mp4
+
+# 文档
+*.docx
+*.pdf
+*.xlsx
+*.rar
+
+# 其他
+*.zip
+*.pkg
+*.pyz
+restart.*
+profile.*
+equ.[0-9]
+*.7z
+*.html
+*.json
+*.svg
+*.mhtml
+*.exe
+*.o
+debug.log
+molecule.png
+compass.frc
+
+# ---------- 仿真结果txt ----------
+*Count_*.txt
+*MSD*.txt
+*RDF*.txt
+*Energy_*.txt
+*Interact_*.txt
+*Coff_*.txt
+*_massdensity*
+*.massdensity
+*PEKE*.txt
+*RG*.txt
+*Temdis*.txt
+*Tensile*.txt
+*Tensile1*.txt
+*Shear_data*
+*Shearstress*
+*_data.txt
+*300K5e-*.txt
+*300_5e-*
+All_*.txt
+All_*.lammpstrj*
+
+# DeepGen/Cp2k 中间文件
+*.species
+*.route
+*.table
+*.moname
+*.reaction*
+*conc.out
+*dipol.out
+*vibtemp.out
+*fra.out

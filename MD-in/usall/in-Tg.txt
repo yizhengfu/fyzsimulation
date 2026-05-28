@@ -1,0 +1,100 @@
+# VARIABLES
+variable fname     index xlink.data_300_1.Equ4NVT.restart #文本
+variable vPre      equal 0.1    #压力值
+variable vTgtem    equal 350    #大概实验玻璃化转变温度50的整数倍
+variable vTghigh   equal 250    #高出玻璃化转变温度的温度，基本不调
+variable vTemdt    equal 20     #温度间隔，基本不调
+variable vNVTtime  equal 100    #50000
+variable vNPTtime  equal 100    #1500000
+variable vTemhi    equal ${vTgtem}+${vTghigh}      #K
+variable vTgnum    equal 2*${vTghigh}/${vTemdt}    #循环次数，必须为整数
+variable vTimestep equal 1      #一般不修改 fs
+variable vFrestep  equal 10     #一般不修改 每隔1000步保存1次
+##############----------------loop Temperature
+shell mkdir Tg_${vPre}MPa
+shell cd Tg_${vPre}MPa
+##############----------------Initial----------------
+log Tg.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set# PCFF potential information
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+#read_data ${fname}
+read_restart   ../${fname}
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------MM----------------
+#min_style cg                                        #  qwh
+#min_modify dmax 0.4
+minimize 1e-10 1e-10 20000 50000                    #能量最小化
+##############----------------Temper controllers
+compute cTall all temp
+compute cEng all pe/atom                                 ## compute potential energy for each atom
+compute cEatoms all reduce sum c_cEng                     ## compute total energy for whole system
+##############----------------Thermo
+timestep ${vTimestep}
+thermo_style custom step temp press pe ke etotal lx ly lz atoms vol c_cEatoms 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo ${vFrestep}
+reset_timestep 0
+#####################################################
+# initial velocities
+#velocity all create ${vTemhi} 5812775 dist gaussian loop geom
+##############----------------Dump----------------##############
+#dump d1 all custom ${vFrestep} All_${vTemhi}_${vPre}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+#dump_modify d1 sort id element C H S C N O H C O C C C C C
+fix 1 all nvt temp ${vTemhi} ${vTemhi} 100 #drag 2
+fix_modify 1 temp cTall
+run ${vNVTtime}
+unfix 1
+write_data ${vTemhi}NVT.data
+#write_restart restart.${vTemhi}NVT.data 
+fix 1 all npt temp ${vTemhi} ${vTemhi} 100 iso ${vPre} ${vPre} 1000 #drag 2
+fix_modify 1 temp cTall
+run ${vNPTtime}
+write_data ${vTemhi}NPT.data
+#write_restart restart.${vTemhi}NPT.data 
+unfix 1
+#undump d1 
+label loopa
+ variable i loop ${vTgnum}
+ variable vTempde equal ${vTemhi}-$i*${vTemdt}
+ variable etotal equal etotal  
+ variable epair  equal epair
+ variable evdwl  equal evdwl
+ variable ecoul  equal ecoul
+ variable ebond  equal ebond
+ variable eangle equal eangle 
+ variable edihed equal edihed
+ variable eimp   equal eimp
+ variable emol   equal emol
+ variable elong  equal elong 
+ variable etail  equal etail
+ variable enthalpy  equal enthalpy  
+ variable V equal vol
+ variable step equal step
+ fix 1 all nvt temp ${vTempde} ${vTempde} 100 #drag 2
+ fix_modify 1 temp cTall
+ run ${vNVTtime}
+ unfix 1
+ write_data ${vTempde}NVT.data
+ fix 1 all npt temp ${vTempde} ${vTempde} 100 iso ${vPre} ${vPre} 1000 #drag 2
+ fix_modify 1 temp cTall
+ run ${vNPTtime}
+ unfix 1
+ print "${step} ${vTempde} ${V}" append Tg_${vPre}MPa.txt 
+ print "${step} ${vTempde} ${etotal} ${epair} ${evdwl} ${ecoul} ${ebond} ${eangle} ${edihed}  ${eimp} ${emol} ${elong} ${etail} ${enthalpy}" append Energy_${vPre}MPa.txt
+ write_data ${vTempde}NPT.data
+next i 
+jump ../in-Tg.txt loopa
+print "All done"

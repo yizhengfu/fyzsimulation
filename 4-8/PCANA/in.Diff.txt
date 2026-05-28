@@ -1,0 +1,258 @@
+#############------------通过给具体Press molecular 施加压力，建立双层模型分别为施压模型和扩散模型，温度NH控温
+variable fname index Layer.data     #data文件
+variable vNvelimit equal 0.000001    
+variable vGasstart   equal 1
+variable vGasend     equal 6000
+variable vPolend     equal 
+variable vMofend     equal 6727
+variable vPercent    equal 0.33     #Equ Dump step
+variable vFrestep    equal 1000       #Dump step
+variable vEqustep    equal  5000      #平衡E时间  
+variable vDifstep    equal  10000000    #扩散时间
+##############----------------loop Temperature
+variable vTemp index 298
+label loopTem
+##############----------------loop Pressure
+variable vPre index 10
+label loopPre
+##############----------------
+shell mkdir ${vTemp}_${vPre}
+shell cd ${vTemp}_${vPre}
+##############----------------Initial----------------
+clear
+units real        
+boundary p p p  
+atom_style full 
+##############----------------Forcefield set
+bond_style class2 
+angle_style class2 
+dihedral_style class2 
+improper_style class2 
+pair_style lj/class2/coul/cut 12.5
+read_data  ../${fname}
+##############----------------Boundary
+change_box all boundary p p s 
+comm_style tiled
+fix fixbalance all balance 1000 1.2 rcb
+##############----------------Group
+variable vPolstart equal ${vGasend}+1
+variable vMOfstart equal ${vPolend}+1
+group Gas id ${vGasstart}:${vGasend}
+group Pol id ${vPolstart}:${vPolend}
+group Mof id ${vMOfstart}:${vMofend}
+group H2Oall type 1 2
+group CH4all type 3 4
+group Mofmov type 6    #Na 
+group He  type 9
+variable vDzlo equal zlo 
+variable vDzhi equal zhi
+variable vDGaslo equal bound(Gas,zmin)
+variable vDGashi equal bound(Gas,zmax)
+variable vDPollo equal bound(Pol,zmin)
+variable vDPolhi equal bound(Pol,zmax) 
+variable vDMoflo equal bound(Mof,zmin)
+variable vDMofhi equal bound(Mof,zmax) 
+variable vDGasth equal ${vDGashi}-${vDGaslo}
+variable vDPreth equal ${vDGasth}*${vPercent}
+variable vDPrehi equal ${vDGaslo}+${vDPreth}
+variable vDMofth equal ${vDMofhi}-${vDMoflo}
+variable vDMofhalfth equal ${vDMofth}*0.5
+variable vDMofhalfhi equal ${vDMoflo}+${vDMofhalfth}
+region box block INF INF INF INF ${vDzlo} ${vDzhi} units box
+region Pre block INF INF INF INF ${vDGaslo} ${vDPrehi} units box
+region Dif block INF INF INF INF ${vDPrehi} ${vDGashi} units box
+region Pol block INF INF INF INF ${vDPollo} ${vDPolhi} units box
+region Mofhalf1 block INF INF INF INF ${vDMoflo} ${vDMofhalfhi} units box
+region Mofhalf2 block INF INF INF INF ${vDMofhalfhi} ${vDMofhi} units box
+region Per block INF INF INF INF ${vDMofhi} ${vDzhi} units box
+group Pre region Pre
+group Dif subtract Gas Pre
+group H2O subtract Dif CH4all
+group CH4 subtract Dif H2Oall
+group Moffix subtract Mof Mofmov 
+group Fix union Mof He
+#group Fix union Moffix He
+##############----------------Neighbour
+neighbor 2 bin  
+neigh_modify every 10 delay 10 check yes one 5000 exclude group Pre Dif
+##############----------------Initial velocities
+velocity Fix set 0.0 0.0 0.0 units box    
+fix	fSetFix Fix setforce 0.0 0.0 0.0   
+##############----------------MM----------------
+minimize 1.0e-6 1.0e-6 1000 10000  
+##############----------------Temper controllers
+compute cTDif Dif temp
+compute cTDif1 Dif temp/partial 1 1 0
+compute cTPol Pol temp
+compute cTPol1 Pol temp/partial 1 1 0
+compute cTMofmov Mofmov temp
+compute cTMofmov1 Mofmov temp/partial 1 1 0
+##############----------------Thermo
+timestep 1 
+thermo 1000  
+thermo_style custom step temp pe ke etotal lx ly lz press atoms vol
+thermo_modify temp cTDif1 flush yes lost ignore 
+##############----------------Equilibrate---------------- 
+reset_timestep 0
+##############----------------Dump
+dump 11 all custom 1000 All_E_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 11 sort id element O H C H O Na Si Al He O C C O C C O C O O 
+dump 12 H2O custom 1000 H2O_E_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 12 sort id element O H C H O Na Si Al He O C C O C C O C O O
+dump 13 CH4 custom 1000 CH4_E_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 13 sort id element O H C H O Na Si Al He O C C O C C O C O O
+dump 14 Pol custom 1000 Pol_E_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 14 sort id element O H C H O Na Si Al He O C C O C C O C O O 
+##############----------------Count 
+group           H2ODifnumE dynamic H2O region Dif every 1000
+variable        H2ODifnumberE equal count(H2ODifnumE)
+group           H2OPolnumE dynamic H2O region Pol every 1000
+variable        H2OPolnumberE equal count(H2OPolnumE)
+group           H2OMofhalf1numE dynamic H2O region Mofhalf1 every 1000
+variable        H2OMofhalf1numberE equal count(H2OMofhalf1numE)
+group           H2OMofhalf2numE dynamic H2O region Mofhalf2 every 1000
+variable        H2OMofhalf2numberE equal count(H2OMofhalf2numE)
+group           H2OPernumE dynamic H2O region Per every 1000
+variable        H2OPernumberE equal count(H2OPernumE)
+fix 21 all ave/time 10 10 1000 v_H2ODifnumberE v_H2OPolnumberE v_H2OMofhalf1numberE v_H2OMofhalf2numberE v_H2OPernumberE file H2OCount_E_${vTemp}.txt
+group           CH4DifnumE dynamic CH4 region Dif every 1000
+variable        CH4DifnumberE equal count(CH4DifnumE)
+group           CH4PolnumE dynamic CH4 region Pol every 1000
+variable        CH4PolnumberE equal count(CH4PolnumE)
+group           CH4Mofhalf1numE dynamic CH4 region Mofhalf1 every 1000
+variable        CH4Mofhalf1numberE equal count(CH4Mofhalf1numE)
+group           CH4Mofhalf2numE dynamic CH4 region Mofhalf2 every 1000
+variable        CH4Mofhalf2numberE equal count(CH4Mofhalf2numE)
+group           CH4PernumE dynamic CH4 region Per every 1000
+variable        CH4PernumberE equal count(CH4PernumE)
+fix 22 all ave/time 10 10 1000 v_CH4DifnumberE v_CH4PolnumberE v_CH4Mofhalf1numberE v_CH4Mofhalf2numberE v_CH4PernumberE file CH4Count_E_${vTemp}.txt
+##############----------------平衡 
+velocity all create ${vTemp} 5812775 dist gaussian loop geom 
+velocity Fix set 0.0 0.0 0.0 units box 
+velocity Pre set 0.0 0.0 0.0 units box   
+fix	fSetPre Pre setforce 0.0 0.0 0.0
+variable vDwall equal bound(Pre,zmax)
+fix fDwall Dif wall/reflect zlo v_vDwall
+fix	fDifNVE Dif nve/limit 0.01
+fix fDifNVT Dif temp/berendsen ${vTemp} ${vTemp}  100.0
+fix_modify fDifNVT temp cTDif
+
+
+##############----------------Run 
+run ${vEqustep}
+write_data All_Equ_${vTemp}.data									 
+write_restart All_Equ_${vTemp}.restart.data
+unfix fSetPre
+unfix fDifNVE
+unfix fDifNVT
+undump 11 
+undump 12
+undump 13
+undump 14
+unfix 21
+unfix 22  
+##############----------------PUSH----------------
+reset_timestep 0
+###############----------------Area
+variable vlx equal lx
+variable vly equal ly
+variable vArea equal ${vlx}*${vly}
+variable vForce equal (${vPre}*${vArea})/6950
+##############----------------Dump
+dump 21 all custom ${vFrestep} All_${vPre}_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 21 sort id element O H C H O Na Si Al He O C C O C C O C O O
+dump 22 H2O custom ${vFrestep} H2O_${vPre}_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 22 sort id element O H C H O Na Si Al He O C C O C C O C O O
+dump 23 CH4 custom ${vFrestep} CH4_${vPre}_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 23 sort id element O H C H O Na Si Al He O C C O C C O C O O
+dump 24 all custom ${vFrestep} Pol_${vPre}_${vTemp}.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 24 sort id element O H C H O Na Si Al He O C C O C C O C O O
+##############----------------Density
+compute Difmassdensity Dif chunk/atom bin/1d z lower 0.01 units reduced   
+fix 11 Dif ave/chunk 10 10 1000 Difmassdensity density/mass file Dif_${vPre}_${vTemp}.massdensity
+compute H2Omassdensity H2O chunk/atom bin/1d z lower 0.01 units reduced   
+fix 12 H2O ave/chunk 10 10 1000 H2Omassdensity density/mass file H2O_${vPre}_${vTemp}.massdensity
+compute CH4massdensity CH4 chunk/atom bin/1d z lower 0.01 units reduced   
+fix 13 CH4 ave/chunk 10 10 1000 CH4massdensity density/mass file CH4_${vPre}_${vTemp}.massdensity
+compute Polmassdensity Pol chunk/atom bin/1d z lower 0.01 units reduced   
+fix 114 Pol ave/chunk 10 10 1000 Polmassdensity density/mass file Pol_${vPre}_${vTemp}.massdensity
+##############----------------Group/group
+compute cIntMofH2O Mof group/group H2O
+compute cIntMofCH4 Mof group/group CH4
+compute cIntCH4H2O CH4 group/group H2O
+compute cIntPolH2O Pol group/group H2O
+compute cIntPolCH4 Pol group/group CH4
+compute cIntMofPol Mof group/group Pol
+fix 21 all ave/time 10 10 1000 c_cIntMofH2O c_cIntMofCH4 c_cIntCH4H2O c_cIntPolH2O c_cIntPolCH4 c_cIntMofPol ave one file Interact_${vPre}_${vTemp}.txt
+##############----------------Energy
+variable etotal equal etotal   
+variable epair equal epair
+variable evdwl equal evdwl
+variable ebond equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable ecoul equal ecoul
+fix 31 all ave/time 10 10 1000 v_etotal v_epair v_evdwl v_ebond v_eangle v_edihed file Energy_${vPre}_${vTemp}.txt
+##############----------------RDF
+compute cRDF all rdf 100 1 6 2 5 3 6 4 6 4 5 1*2 5*8 3*4 5*8 1*2 10*18 3*4 10*18
+fix 41 all ave/time 10 10 1000 c_cRDF[*] file RDF_${vPre}_${vTemp}.txt mode vector
+fix 42 all ave/time ${vDifstep} 1 ${vDifstep} f_41[*] file RDFave_${vPre}_${vTemp}.txt mode vector
+##############----------------MSD           
+compute cMSDH2O H2O msd com yes 
+variable vtwopointH2O equal c_cMSDH2O[4]/6/(step*dt+1.0e-6) 
+fix 51 H2O vector 1000 c_cMSDH2O[4]
+variable vfitslopeH2O equal slope(f_51)/6/(1000*dt)
+fix 52 H2O ave/time 1 1 1000 c_cMSDH2O[1] c_cMSDH2O[2]  c_cMSDH2O[3]  c_cMSDH2O[4] v_vtwopointH2O v_vfitslopeH2O file MSDH2O_${vPre}_${vTemp}.txt
+compute cMSDCH4 CH4 msd
+variable vtwopointCH4 equal c_cMSDCH4[4]/6/(step*dt+1.0e-6) 
+fix 53 CH4 vector 1000 c_cMSDCH4[4]
+variable vfitslopeCH4 equal slope(f_53)/6/(${vFrestep}*dt)
+fix 54 CH4 ave/time 1 1 1000 c_cMSDCH4[1] c_cMSDCH4[2]  c_cMSDCH4[3]  c_cMSDCH4[4] v_vtwopointCH4 v_vfitslopeCH4 file MSDCH4_${vPre}_${vTemp}.txt
+##############----------------Count 
+group           H2OPolnum dynamic H2O region Pol every ${vFrestepE}
+variable        H2OPolnumber equal count(H2OPolnum)
+group           H2OMofhalf1num dynamic H2O region Mofhalf1 every ${vFrestep}
+variable        H2OMofhalf1number equal count(H2OMofhalf1num)
+group           H2OMofhalf2num dynamic H2O region Mofhalf2 every ${vFrestep}
+variable        H2OMofhalf2number equal count(H2OMofhalf2num)
+group           H2OPernum dynamic H2O region Per every ${vFrestep}
+variable        H2OPernumber equal count(H2OPernum)
+variable        H2OAllnumber equal count(H2O)
+variable        H2ODifnumber equal v_H2OAllnumber-v_H2OPolnumber-v_H2OMofhalf1number-v_H2OMofhalf2number-v_H2OPernumber 
+fix 61 all ave/time 1 1 ${vFrestep} v_H2ODifnumber v_H2OPolnumber v_H2OMofhalf1number v_H2OMofhalf2number v_H2OPernumber file H2OCount_${vPre}_${vTemp}.txt
+group           CH4Difnum dynamic CH4 region Dif every ${vFrestep}
+variable        CH4Difnumber equal count(CH4Difnum)
+group           CH4Polnum dynamic CH4 region Pol every ${vFrestepE}
+variable        CH4Polnumber equal count(CH4Polnum)
+group           CH4Mofhalf1num dynamic CH4 region Mofhalf1 every ${vFrestep}
+variable        CH4Mofhalf1number equal count(CH4Mofhalf1num)
+group           CH4Mofhalf2num dynamic CH4 region Mofhalf2 every ${vFrestep}
+variable        CH4Mofhalf2number equal count(CH4Mofhalf2num)
+group           CH4Pernum dynamic CH4 region Per every ${vFrestep}
+variable        CH4Pernumber equal count(CH4Pernum)
+variable        CH4Allnumber equal count(CH4)
+variable        CH4Difnumber equal v_CH4Allnumber-v_CH4Polnumber-v_CH4Mofhalf1number-v_CH4Mofhalf2number-v_CH4Pernumber
+fix 62 all ave/time 1 1 ${vFrestep} v_CH4Difnumber v_CH4Polnumber v_CH4Mofhalf1number v_CH4Mofhalf2number v_CH4Pernumber file CH4Count_${vPre}_${vTemp}.txt
+##############----------------Press
+fix	fSetPre Pre setforce 0.0 0.0 NULL    
+fix	fAvePre Pre aveforce NULL NULL ${vForce} 
+fix fPreNVE Pre nve/limit 0.0001
+#fix fMofmovNVE Mofmov nve/limit ${vNvelimit}
+fix fPolNVE Pol nve/limit 0.0001
+fix fDifNVE Dif nve/limit 0.01
+fix fDifNVT Dif temp/berendsen ${vTemp} ${vTemp}  100.0 
+fix_modify 2 temp cTDif1 
+##############----------------Run
+run ${vDifstep}
+write_data  All_fin_${vPre}_${vTemp}.data									 
+write_restart All_fin_${vPre}_${vTemp}.restart.data
+unfix fPreNVE
+#unfix fMofmovNVE
+unfix fPolNVE
+unfix fDifNVE
+unfix fDifNVT
+shell cd ../
+next vPre
+jump in.Diff.txt loopPre 
+next vTemp
+jump in.Diff.txt loopTem

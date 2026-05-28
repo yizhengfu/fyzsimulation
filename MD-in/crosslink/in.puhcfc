@@ -1,0 +1,40 @@
+#################################################################################################################################
+#--------Initialization-------------------------------                                                                                                               
+units                   real                                                                                                                                                        
+dimension               3                                                                                                                                                             
+boundary	            p p p                                                                                                                                                        
+atom_style              full           
+################################################################################################
+#--------Dreiding potential information-------------
+neighbor	            3.0 bin   
+neigh_modify            every 1 delay 0 check yes
+bond_style              class2 
+angle_style             class2 
+dihedral_style          class2 
+improper_style          class2  
+kspace_style            pppm 0.0001
+pair_style              lj/class2/coul/long  12.0  12.0 
+pair_modify             shift yes mix arithmetic
+special_bonds           lj/coul 0.0 0.0 0.5
+read_data               su8pcff_after_cross_0.48427672955974843.data
+#include                 "system.in.settings"
+thermo_style            custom step temp press vol density xlo xhi ylo yhi zlo zhi
+thermo                  200
+################### #############################################################################	
+#------------- minimize ---------------------------------
+min_style              cg
+minimize               0.0       1.0e-6    5000        10000
+thermo                 200
+#timestep               0.5
+################################################################################################
+################################################################################################
+#------------- NPT relax at 600k 800Pa ---------------
+reset_timestep          0
+timestep                0.2
+velocity 	            all create 600 758754545 mom yes rot yes dist gaussian
+fix		                1 all npt temp 600 600 $(100*dt) iso 800 800 $(1000*dt)   
+run                     20000
+write_data              su8pcff_after_cross_0.48427672955974843.data
+unfix                   1
+reset_timestep          0
+################################################################################################

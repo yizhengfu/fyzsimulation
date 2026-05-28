@@ -1,0 +1,79 @@
+# sample LAMMPS input script for viscosity of 2d LJ liquid
+# Green-Kubo method via fix ave/correlate
+
+# settings
+
+variable	x equal 20
+variable	y equal 20
+
+variable	rho equal 0.6
+variable    t   equal 300
+variable	rc  equal 2.5
+
+variable    p equal 400     # correlation length
+variable    s equal 5       # sample interval
+variable    d equal $p*$s   # dump interval 
+#variable	dt equal 0.001
+# problem setup
+units           metal
+boundary        p p p
+atom_style      charge
+processors      * * 1 
+# System and atom definition
+# we use different molecule ids for each layer of hBN
+# so that inter- and intra-layer
+# interactions can be specified separately
+read_data       SiC.data
+mass            1 12.011000  # boron mass (g/mole) | membrane
+mass            2 28.085500   # nitrogen mass (g/mole) | adsorbate
+######################## Potential defition ########################
+pair_style  tersoff shift 0.05
+pair_coeff  * * SiC.tersoff C Si
+####################################################################
+# Neighbor update settings
+neighbor        2.0 bin
+neigh_modify    every 1
+neigh_modify    delay 0
+neigh_modify    check yes
+#### Simulation settings ####
+timestep        0.001
+#velocity        all create 300.0 4928459 loop geom
+velocity        all create $t 97287 loop geom
+# equilibration run
+fix         1 all nve
+fix	        2 all langevin $t $t 1 498094
+#fix	        3 all enforce2d
+thermo      $d
+run	        10000
+velocity	all scale $t
+unfix		2
+
+# Green-Kubo viscosity calculation
+
+reset_timestep  0
+
+# Define distinct components of symmetric traceless stress tensor
+ 
+variable         pxy equal pxy
+variable         pxx equal pxx-press
+
+fix              SS all ave/correlate $s $p $d &
+                 v_pxy v_pxx type auto file profile.gk.2d ave running
+
+# Diagonal components of SS are larger by factor 2-2/d,
+# which is 4/3 for d=3, but 1 for d=2.
+# See Daivis and Evans, J.Chem.Phys, 100, 541-547 (1994)
+
+variable         scale equal 1.0/$t*vol*$s*dt
+variable         diagfac equal 2-2/3
+variable         vxy equal trap(f_SS[3])*${scale}
+variable         vxx equal trap(f_SS[4])*${scale}/${diagfac}
+dump	         1 all custom 100 dump.mp id type x y z vx
+thermo_style     custom step temp press pxy v_vxy v_vxx
+
+run              500000
+
+variable         etaxy equal v_vxy
+variable         etaxx equal v_vxx
+variable         eta equal 0.5*(${etaxy}+${etaxx})
+print            "running average viscosity: ${eta}"

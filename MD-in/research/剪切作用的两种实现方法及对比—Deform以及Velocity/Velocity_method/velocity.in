@@ -1,0 +1,144 @@
+############################################################################
+################################# Velocity method ##########################
+############################################################################
+
+#------------------------------Model settings--------------------------
+clear
+shell               mkdir output ./output/minimize ./output/relax ./output/shear ./output/data
+
+#------------------------------Basic settings--------------------------
+units               metal
+dimension           3  
+boundary            s s p        
+atom_style          atomic
+
+variable            Temp equal 10          	# desired temperature
+variable            tstp equal 0.001            # timestep
+variable            tdamp equal 100*${tstp}     # damping parameters # 
+variable            pdamp equal 1000*${tstp}    # for NPT ensemble   #
+variable            dump_every equal 1000       
+variable            equi_step equal 10000
+
+
+read_data           Ni_supercell.lmp
+
+variable            size_x equal xhi-xlo
+variable            size_y equal yhi-ylo
+variable            size_z equal zhi-zlo
+
+variable            layer_thickness equal 0.1*${size_y}
+variable            upper_layer_limit  equal  ${size_y}-${layer_thickness}
+variable            lower_layer_limit  equal  ${layer_thickness}
+
+# Define regions
+region              upper block INF INF ${upper_layer_limit} INF INF INF units box          
+region              lower block INF INF INF ${lower_layer_limit} INF INF units box 
+
+# Define groups
+group               upper region upper
+group               lower region lower
+group               boundary union upper lower
+group               mobile subtract all boundary
+
+#----------------------------------------- Force Field ------------------------------------
+pair_style          eam             
+pair_coeff          * * Ni_u3.eam
+
+#--------------------------------------------- Minimization ---------------------------------------
+thermo              100
+timestep            ${tstp}
+thermo_style        custom step temp etotal pe ke pxz
+
+# fix boundary group
+
+
+# compute specific quantities
+compute             pot_energy all pe/atom
+compute             stress all stress/atom NULL
+dump                min all custom ${dump_every} ./output/minimize/dump_minimize.*.lammpstrj id type x y z c_pot_energy 
+
+
+min_style           cg
+minimize            1.0e-6 1.0e-6 10000 10000
+
+write_data          ./output/minimize/mini.data
+
+#------------------------------------------ equilibrium -------------------------------
+undump              min
+reset_timestep      0
+
+compute             new3d mobile temp
+compute             new2d mobile temp/partial 0 1 1
+
+velocity            mobile create ${Temp} 12345 units box
+
+
+#fix				1 all npt temp ${Temp} ${Temp} ${tdamp} aniso 0.0 0.0 ${pdamp}
+fix				1 all nve
+fix                 0 boundary setforce 0.0 0.0 0.0
+fix                 2 mobile temp/rescale 10 ${Temp} ${Temp} 10.0 1.0
+fix_modify          2 temp new3d
+
+#fix_modify          1 temp new3d
+
+thermo              1000
+thermo_modify       temp new3d
+run                 ${equi_step} 
+
+write_data          ./output/relax/equil.data
+write_restart       ./output/relax/equil.restart
+
+#------------------------------------------- shear in xy plane -------------------------------------
+#change_box          all boundary s s p
+
+reset_timestep      0
+unfix               1
+
+#fix				1 all nvt temp ${Temp} ${Temp} ${tdamp}
+#fix_modify          1 temp new3d
+
+#run				10000
+#reset_timestep      0
+#unfix               1
+
+variable            tmpx equal lx
+variable            tmpy equal ly
+variable            tmpz equal lz
+variable            L0x equal ${tmpx}
+variable            L0y equal ${tmpy}
+variable            L0z equal ${tmpz}
+variable        	vol_ini equal v_L0x*v_L0y*v_L0z
+print "Initial volumn, vol = ${vol_ini}"
+# In units metal, pressure is in [bars]; sxx, syy, szz are in GPa
+compute         	2 mobile stress/atom NULL
+compute         	strsxy mobile reduce sum c_2[4]
+variable        	unit equal 1E-4
+
+#variable        	sxy equal ${unit}*(c_strsxy/v_vol_ini)
+variable            deltaL  equal  (lx-${L0x})
+variable            sxy equal "-pxy/10000"          # calculate shear stress
+variable            strain equal v_deltaL/ly        # calculate shear strain
+
+variable            srate equal 0.01           
+variable            vx equal ${srate}*${L0y}
+variable            final_strain equal 0.3
+#variable            dyna_step equal ${final_strain}/(${srate}*${tstp})
+variable			dyna_step equal 15000
+
+# deformation starts!
+fix				1 all nve
+fix                 2 mobile temp/rescale 10 ${Temp} ${Temp} 10.0 1.0
+fix_modify          2 temp new2d
+
+velocity            upper set 2.0 0.0 0.0 units box
+velocity            mobile ramp vx 0.0 2.0 y ${lower_layer_limit} ${upper_layer_limit} sum yes units box
+
+dump                result all custom ${dump_every} ./output/shear/dump.*.lammps id type x y z
+fix                 def1 all print 1000 "${strain} ${sxy}" file ./output/data/Shear_data.txt screen no
+#fix                 def1 all ave/time 100 10 1000 v_strain v_sxy file ./output/data/Shear_data.txt
+thermo_style 	    custom step press pe pxx pyy pzz pxy pxz pyz v_strain v_sxy
+run                 ${dyna_step}
+write_data          ./output/shear/shear_end.*.data
+write_restart       ./output/shear/shear_end.*.restart
+
+print "-------------------------------- All done! -----------------------------------------"

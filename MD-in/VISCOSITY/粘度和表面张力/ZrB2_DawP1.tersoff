@@ -1,0 +1,39 @@
+# Tersoff Parameters for Zr(solid), B(solid), and ZrB2 
+# by  Daw, M. S.; Lawson, J. W.; Bauschlicher Jr.,
+# C. W. Interatomic Potentials for Zirconium Diboride 
+# and Hafnium Diboride. Computational Materials Science 2011, 50, 2828–2835.
+# Potential 1 (Zr-1/WM2)
+
+# File Created by: 
+# Author - Stefan Bringuier
+# Affiliation - University of Arizona, Materials Science and Engineering
+
+# Tersoff parameters for various elements and mixtures
+# multiple entries can be added to this file, LAMMPS reads the ones it needs
+# these entries are in LAMMPS "metal" units:
+#   A,B = eV; lambda1,mu,lambda3 = 1/Angstroms; R,D = Angstroms
+#   other quantities are unitless
+
+# format of a single entry (one or more lines):
+#   element 1, element 2, element 3,
+#               m, gamma, lambda3, c, d, h, n,
+#               beta, mu, B, R, D, lambda1, A
+
+# i    j    k    m    gamma    lambda3   c    d    h    n    beta    mu   B    R = (R+S)/2  D = (S-R)/2   lambda1   A    
+
+Zr    Zr    Zr    1    1    1.32308    0   1    0    1    1    0.661542    36.8286    5.030    0.150    2.92969    3656.7405
+
+B    B    B     1    1    0.0000   0   1   0    21.885575   0.5410   1.1901670    36.767392   2.350    0.15    3.9552780     1061.9848
+
+Zr   B    B     1    0.9751164    1.32308    0    1    0    1    1    0.9258545    40.127474    3.44    0.16    3.3688840    1900.8612    
+
+Zr   Zr   B     1    0.1905300    1.32308    0    1    0    1    1    0.661542    36.8286    5.030    0.150    2.92969    3656.7405
+
+Zr   B   Zr     1    9.5016209    1.32308    0    1    0    1    1    0.9258545    40.127474    3.44    0.16    3.3688840    1900.8612
+
+B    Zr   Zr    1    0.9999995    0.0000   0   1   0    21.885575   0.5410   0.9258545    40.127474    3.44    0.16    3.3688840    1900.8612    
+
+B    B    Zr    1    0.1721612    0.0000   0   1   0    21.885575   0.5410   1.1901670    36.767392   2.350    0.15    3.9552780     1061.9848
+
+B    Zr   B     1    1.0000000    0.0000   0   1   0    21.885575   0.5410   0.9258545    40.127474    3.44    0.16    3.3688840    1900.8612    
+

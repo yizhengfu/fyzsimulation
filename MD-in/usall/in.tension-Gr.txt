@@ -1,0 +1,90 @@
+units metal
+dimension 3
+boundary s s p
+neighbor 0.3 bin
+neigh_modify delay 0
+timestep 0.001
+region box block 0 50 -1 56 -5 5 units box
+create_box 3 box
+lattice custom 2.4768 & 
+a1 1.0 0.0 0.0 &
+a2 0.0 1.732 0.0 &
+a3 0.0 0.0 1.3727 &
+basis 0.0 0.33333 0.0 &
+basis 0.0 0.66667 0.0 &
+basis 0.5 0.16667 0.0 &
+basis 0.5 0.83333 0.0
+region graphene block 0 50 0 50 -1 2 units box
+create_atoms 1 region graphene
+mass * 12
+group graphene type 1
+variable xmax1 equal bound(graphene,xmax)-4
+variable xmin1 equal bound(graphene,xmin)+4
+region left block INF ${xmin1} INF INF INF INF units box
+group left region left
+region right block ${xmax1} INF INF INF INF INF units box
+group right region right
+group boundary union left right
+group mobile subtract all boundary
+set	group left type 2
+set	group right type 3
+group del id 382
+delete_atoms group del
+#力场设置
+pair_style airebo 3.0 0 0
+pair_coeff * * CH.airebo C C C
+write_data Ge0.data
+#能量最小化	
+min_style cg
+minimize 1e-10 1e-10 5000 5000
+#温度初始化
+velocity mobile create 300 4928459 dist gaussian units box
+#固定边界层	
+velocity left set 0.0 0.0 0.0 units box
+velocity right set 0.0 0.0 0.0 units box
+fix fleft left setforce 0.0 0.0 0.0
+fix fright right setforce 0.0 0.0 0.0
+#应力计算	
+compute	1 mobile stress/atom NULL
+#compute 2 mobile reduce sum c_1[1] c_1[2] #原来
+compute 2 mobile reduce sum c_1[1] c_1[2] c_1[3] 
+variable CorVol equal (lx-8)*ly*3.35
+variable sigmaxx equal c_2[1]/(v_CorVol*10000)
+#应变计算	
+variable l_x equal lx-8
+variable lx0 equal ${l_x}
+variable strain equal (lx-8-v_lx0)/v_lx0
+compute my_stress all stress/atom NULL
+#驰豫	
+fix	2 all nvt temp 300 300 0.01
+thermo 100
+write_data Ge.data
+dump 1 all atom 100 relax.xyz
+run	200
+unfix 2
+undump 1
+reset_timestep 0
+#拉伸结果输出
+thermo_style custom step press temp lx ly lz vol 
+thermo 100
+variable istep equal step
+fix	def all print 100 "${istep} ${strain} ${sigmaxx}" screen yes
+fix date all ave/time 1 1 100 v_istep v_strain v_sigmaxx file date4.txt
+fix stree all ave/atom 1 1 100 c_my_stress[*] 
+dump 3 all custom 100 tmp.dump id f_stree[*]
+#fix 41 mobile ave/time 1 1 100 c_1[1][*] file stress.txt mode vector
+#fix com all ave/time 1 1 100 c_1[*] file com.txt mode vector
+##############----------------MSD       
+#fix date all ave/time 1 1 100 v_istep v_strain v_sigmaxx file date3.txt
+dump 1 all atom 500 tensionO.xyz
+dump 2 all custom 1000 All.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 2 element C H O
+#拉伸时系综设置
+fix	2 all nvt temp 300 300 0.01
+#设置两端边界层双向移动
+velocity right set 0.5 0 0
+velocity left set -0.5 0 0
+#设置中间变形区域速度梯度
+velocity mobile ramp vx -0.5 0.5 x ${xmin1} ${xmax1} sum yes units box
+#启动运算
+run	15000

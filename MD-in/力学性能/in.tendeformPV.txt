@@ -1,0 +1,91 @@
+﻿# 轴对称拉伸，应变率参考10.1016/j.actamat.2018.03.055，提及1E7-1E9应变率差别不大（4%差异）
+# VARIABLES
+variable fname index  xlink_final.data300K0.101MPa_Equ4NPT.data                 #不同压力下的模型，和vPre的模型对应
+variable vTenstrain   equal 2             #最终的应变，控制模拟时间 
+#variable vTenstep1    equal 500000  
+variable vTemp        equal 300
+variable vFrestep     equal 1000          #一般不需要改
+#variable vTenstep equal 90000
+##############----------------loop Press
+label loopPre 
+variable vPre index 0.101  #温度
+#variable vPre equal 0.101         #单位MPa 常压1atm=0.101Mpa   改为0再试一下
+variable vPress equal ${vPre}*9.87  #压力 1MPa=9.87atm 
+##############----------------loop Velocity
+label loopVel
+variable vVel index 1E-5 1E-6 1E-7 #应变速度   #unit is 1/fs
+##############----------------
+shell mkdir ${vPre}MPa${vVel}
+shell cd ${vPre}MPa${vVel}
+##############----------------Initial----------------
+log ${vPre}MPa${vVel}log.txt
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+#read_data ../${fname}.data
+read_restart ../${fname}
+#############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+#neigh_modify delay 5 check yes one 10000 #近邻表更新频率
+#####################################################
+# initial velocities
+timestep 1
+reset_timestep 0  #重设时间步为0
+#velocity all create ${vTemp} 5812775 dist gaussian loop geom
+##############----------------Temper controllers
+compute cTall all temp
+compute cPress all pressure thermo_temp
+##############----------------Thermo
+thermo_style custom step temp press pe ke etotal lx ly lz pxy pxz pyz vol 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo 1000
+##############----------------应变计算	
+variable lzn equal lz
+variable lz0 equal ${lzn}
+variable vStrain equal (v_lzn-v_lz0)/v_lz0
+variable vTenstep equal floor(${vTenstrain}/${vVel}/1000)*1000
+variable vFrestep equal ${vTenstep}/1000
+variable vDfrestep equal ${vTenstep}/100
+variable Nrepeat equal ${vTenstep}/${vFrestep}
+##############----------------应力计算	
+variable p1 equal (-pxx*1.01325)/10000 #单位1atm转1bar再转GPa 常压1atm=0.101Mpa
+variable p2 equal (-pyy*1.01325)/10000
+variable p3 equal (-pzz*1.01325)/10000
+fix tension all ave/time 1 1 ${vFrestep} v_vStrain v_p3 v_p2 v_p1 file ${vPre}MPa${vVel}Tensile.txt
+fix tension2 all print ${vFrestep} "${vStrain} ${p3} ${p2} ${p1}" file ${vPre}MPa${vVel}Tensile1.txt screen no  #将后续计算的应变和应力信息输出到额外的文件Tensile_data.txt中，不显示在屏幕上
+##############----------------Dump
+##############----------------Dump
+##############----------------Dump
+dump 1 all custom ${vDfrestep} ${vPre}MPa${vVel}Tensile.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 element C N O C H H C O C C C C C S
+##############----------------Tension
+fix 1 all npt temp ${vTemp} ${vTemp} 100 x ${vPress} ${vPress} 1000 y ${vPress} ${vPress} 1000 drag 0.2   #拉伸也是在npt系综下进行
+#fix_modify 1 temp cTall press cPress
+fix 2 all deform 1 z erate ${vVel} units box remap x  #沿着z方向拉伸（z），指定工程应变率（erate），拉伸过程会自动映射原子到新的盒子中（remap x）
+run ${vTenstep}     ##########################不能与vTenstep1混用
+#run ${vTenstep1}    ##########################
+write_data ${fname}deform.data
+write_restart  ${fname}deform.restart
+unfix 1
+unfix 2
+unfix tension
+unfix tension2
+undump 1 
+#####################################################
+shell cd ../
+next vVel
+jump in.tendeform.txt loopVel
+next vPre
+jump in.tendeform.txt loopPre
+print "All done"

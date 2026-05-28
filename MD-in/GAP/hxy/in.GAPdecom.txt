@@ -1,0 +1,72 @@
+# Initialization
+variable filename  index gaponechain_0Kcalmol_EquNPT      #模型文件  
+variable vStep     equal 1           #统计产物步长
+variable vFrestep  equal 1         #Dump、Thermo步长
+variable vNVTStep  equal 10000           #100000 平衡NVT时间
+variable vdt       equal 0.1          #步长
+#=========================== 模拟基本参数 ==============================
+label           loopTemp              #将该行的字符串指定为一个ID，供命令jump使用
+variable vTemp  index 3000 2850 2700 2550 2400 2250 2100 1950 1800 1650 1500 #0
+shell           mkdir ${vTemp}T       #创建目录
+shell           cd ${vTemp}T          #改变工作目录
+log log.${vTemp}decom.txt             #写入信息
+units           real
+dimension       3                     #模拟维度
+boundary        p  p  p               #x y z 三个方向均为周期性
+atom_style      full                  #原子类型 
+neighbor        2.5 bin               #近邻原子信息
+neigh_modify    every 10 delay 0 check no
+#===============    读取模型文件并分组================
+read_data       ../${filename}.data group GAP #读取data文件
+#===========================  势函数设置
+pair_style reax/c NULL  #势类型
+pair_coeff * *  ../ffield.reax.rdx  C C H C O N H N N O      #所有的原子，后面的元素和data文件中的mass一一对应
+fix   			q all qeq/reax 1 0.0 10.0 1e-6 reax/c        #电荷平衡
+fix             bonds all reax/c/bonds ${vStep} bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 20 species.out element C C H C O N H N N O #每隔1步采样一次键级，采样100次，并在20000步的时候输出平均键级
+timestep        ${vdt}                       #时间步长
+reset_timestep  0                   #重新设定时间步长
+#===========================  计算能量
+compute reax all pair reax/c          
+variable eb  	 equal c_reax[1]
+variable ea  	 equal c_reax[2]
+variable elp 	 equal c_reax[3]
+variable emol 	 equal c_reax[4]
+variable ev 	 equal c_reax[5]
+variable epen 	 equal c_reax[6]
+variable ecoa 	 equal c_reax[7]
+variable ehb 	 equal c_reax[8]
+variable et 	 equal c_reax[9]
+variable eco 	 equal c_reax[10]
+variable ew 	 equal c_reax[11]
+variable ep 	 equal c_reax[12]
+variable efi 	 equal c_reax[13]
+variable eqeq 	 equal c_reax[14]
+thermo		     ${vFrestep}                    #每隔X步输出一次
+thermo_style 	custom step temp etotal ke pe press &
+		v_eb v_ea v_elp v_emol v_ev v_epen v_ecoa &
+		v_ehb v_et v_eco v_ew v_ep v_efi v_eqeq                 #输出内容
+compute          cTall all temp
+thermo_modify    temp  cTall flush yes lost ignore              #数据不保存 实时输出
+#===========================  Dump
+dump 			 1 all custom ${vFrestep} ${filename}_${vTemp}T_NVT.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出
+dump               2 all custom ${vFrestep} ${filename}_${vTemp}T_NVT_trj_ana.lammpstrj id type x y z
+dump               3 all custom ${vFrestep} ${filename}_${vTemp}T_NVT_bonds_ana.lammpstrj id mol type q x y z
+dump_modify 	 1 sort id element  C C H C O N H N N O 
+dump_modify 	 2 sort id element  C C H C O N H N N O 
+dump_modify 	 3 sort id element  C C H C O N H N N O 
+#===========================  NVT
+fix              1 all nve                                             #nve系综
+fix              2 all temp/berendsen ${vTemp} ${vTemp} $(100.0*dt)    #berenbdsen控温法
+run              ${vNVTStep}
+write_data       ${filename}_${vTemp}T_NVT.data	
+write_restart 	 ${filename}_${vTemp}T_NVT.restar
+unfix            1
+unfix            2
+undump           1
+clear
+#------------------------------------------------------------
+shell            cd ../
+next             vTemp
+jump             in.GAPdecom.txt loopTemp                        #跳转到对应文件
+print "All done"

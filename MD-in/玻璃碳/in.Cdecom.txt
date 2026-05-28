@@ -1,0 +1,141 @@
+# Initialization
+variable filename  index c17          #模型文件  
+variable vStep     equal 1000         #统计产物步长
+variable vFrestep  equal 1000         #Dump、Thermo步长
+variable vNVTStep  equal 2000000      #100000 平衡NVT时间
+variable vdt       equal 0.1          #步长
+variable vTemhi    equal 9000
+variable vTem      equal 300
+variable vPress0   equal 1            #压力单位大气压 atom
+variable vPress1   equal 3            #压力单位大气压 GPa
+variable vPress    equal ${vPress1}*9869  #压力单位1GPa=9869atom
+variable vNVT1Step equal 200000
+variable vNVT2Step equal 55000
+variable vNVT3Step equal 2000000
+variable vNVT4Step equal 32000
+variable vNVT5Step equal 100000
+#=========================== 模拟基本参数 ==============================
+label              loopTemp              #将该行的字符串指定为一个ID，供命令jump使用
+variable vTemlo    index 3500 #0
+shell              mkdir ${filename}_${vTemlo}T_${vPress1}GPa       #创建目录
+shell              cd ${filename}_${vTemlo}T_${vPress1}GPa          #改变工作目录
+log                log.${vTemlo}decom.txt #写入信息
+units              real
+dimension          3                     #模拟维度
+boundary           p  p  p               #x y z 三个方向均为周期性
+atom_style         full                  #原子类型 
+neighbor           2.5 bin               #近邻原子信息
+neigh_modify       every 10 delay 0 check no
+#===============    读取模型文件并分组================
+read_data          ../${filename}.data   #读取data文件
+#===========================  势函数设置
+pair_style reax/c NULL                #势类型
+#pair_coeff * * ../C.ff C            #所有的原子，后面的元素和data文件中的mass一一对应
+pair_coeff * * ../CHO.ff C    
+fix   			q all qeq/reax 1 0.0 10.0 1e-6 reax/c        #电荷平衡
+#===========================  能量最小化
+timestep        ${vdt}            
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#===========================  第一步
+velocity all create ${vTemhi} 7474747 rot yes dist gaussian #设置初始速度 所有的原子 温度300K seed 服从高斯分布
+thermo ${vFrestep} #每100步输出一次
+thermo_style     custom  step pe ke etotal temp lx ly lz press atoms vol
+compute          cTall all temp
+thermo_modify    temp  cTall flush yes lost ignore         #数据实时输出 不保存
+fix             bonds all reax/c/bonds ${vFrestep} ${vTemhi}bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 ${vFrestep} ${vTemhi}species.out element C  #每隔1步采样一次键级，采样100次，并在20000步的时候输出平均键级
+#fix 1 all nvt temp ${vTemhi} ${vTemhi} $(100.0*dt)         #drag 2
+fix 1 all npt temp ${vTemhi} ${vTemhi} $(100.0*dt) iso ${vPress0} ${vPress0} $(1000*dt)
+fix_modify 1 temp cTall
+run              ${vNVT1Step}
+unfix 1
+unfix bonds
+unfix species
+reset_timestep  0
+#===========================  第二步
+#fix 1 all nvt temp ${vTemhi} ${vTemlo} $(100.0*dt)         #drag 2
+fix 1 all npt temp ${vTemhi} ${vTemlo} $(100.0*dt) iso ${vPress0} ${vPress0} $(1000*dt)
+fix_modify 1 temp cTall
+fix             bonds all reax/c/bonds ${vFrestep} ${vTemhi}_${vTemlo}bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 ${vFrestep} ${vTemhi}_${vTemlo}species.out element C  #每隔1步采样一次键级，采样100次，并在20000步的时候输出平均键级
+run              ${vNVT2Step}
+unfix 1
+unfix bonds
+unfix species
+reset_timestep  0
+#===========================  第三步
+#fix 1 all nvt temp ${vTemlo} ${vTemlo} $(100.0*dt)         #drag 2
+fix 1 all npt temp ${vTemlo} ${vTemlo} $(100.0*dt) iso ${vPress} ${vPress} $(1000*dt)
+fix_modify 1 temp cTall
+fix_modify 1 temp cTall
+fix             bonds all reax/c/bonds ${vFrestep} ${vTemlo}bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 ${vFrestep} ${vTemlo}species.out element C  
+run              ${vNVT3Step}
+unfix 1
+unfix bonds
+unfix species
+reset_timestep  0
+#===========================  第四步
+#fix 1 all nvt temp ${vTemlo} ${vTem} $(100.0*dt)         #drag 2
+fix 1 all npt temp ${vTemlo} ${vTem} $(100.0*dt) iso ${vPress} ${vPress0} $(1000*dt)
+fix_modify 1 temp cTall
+fix             bonds all reax/c/bonds ${vFrestep} ${vTemlo}_${vTem}bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 ${vFrestep} ${vTemlo}_${vTem}species.out element C  
+run              ${vNVT4Step}
+unfix 1
+unfix bonds
+unfix species
+reset_timestep  0
+#===========================  第五步
+fix 1 all nvt temp ${vTem} ${vTem} $(100.0*dt)         #drag 2
+fix_modify 1 temp cTall
+#===========================  计算能量
+compute reax all pair reax/c         
+variable eb  	 equal c_reax[1]
+variable ea  	 equal c_reax[2]
+variable elp 	 equal c_reax[3]
+variable emol 	 equal c_reax[4]
+variable ev 	 equal c_reax[5]
+variable epen 	 equal c_reax[6]
+variable ecoa 	 equal c_reax[7]
+variable ehb 	 equal c_reax[8]
+variable et 	 equal c_reax[9]
+variable eco 	 equal c_reax[10]
+variable ew 	 equal c_reax[11]
+variable ep 	 equal c_reax[12]
+variable efi 	 equal c_reax[13]
+variable eqeq 	 equal c_reax[14]
+thermo		     ${vFrestep}                    #每隔X步输出一次
+thermo_style 	custom step temp etotal ke pe press &
+		v_eb v_ea v_elp v_emol v_ev v_epen v_ecoa &
+		v_ehb v_et v_eco v_ew v_ep v_efi v_eqeq                 #输出内容
+thermo_modify    temp  cTall flush yes lost ignore              #数据不保存 实时输出
+#===========================  Dump
+dump 			 1 all custom ${vFrestep} ${filename}_${vTemlo}T_NVT.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出
+dump             2 all custom ${vFrestep} ${filename}_${vTemlo}T_NVT_trj_ana.lammpstrj id type x y z element
+dump             3 all custom ${vFrestep} ${filename}_${vTemlo}T_NVT_bonds_ana.lammpstrj id mol type q x y z
+dump_modify 	 1 sort id element  C
+dump_modify 	 2 sort id element  C
+dump_modify 	 3 sort id element  C
+#===========================
+fix             bonds all reax/c/bonds ${vFrestep} ${vTem}bonds.reax   #成键信息
+fix             species all reax/c/species 1 1 ${vFrestep} ${vTem}species.out element C 
+#===========================
+run              ${vNVT5Step}
+#===========================  data
+write_data       ${filename}_${vTemlo}T_NVT.data	
+write_restart 	 ${filename}_${vTemlo}T_NVT.restar
+unfix            1
+unfix bonds
+unfix species
+reset_timestep  0
+undump           1
+undump           2
+undump           3
+clear
+#------------------------------------------------------------
+shell            cd ../
+next             vTemlo
+jump             in.Cdecom.txt loopTemp                        #跳转到对应文件
+print "All done"

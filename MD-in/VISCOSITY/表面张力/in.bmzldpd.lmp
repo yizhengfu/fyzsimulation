@@ -1,0 +1,51 @@
+# DPD.模型.png
+#初始化
+units lj
+dimension             3
+boundary              p p p
+neighbor              0.3 bin
+neigh_modify          every 1 delay 0 check yes
+atom_style            mdpd
+#模拟盒子 
+region              box block 0 8 0 8 0 8 units box
+create_box          1 box
+lattice             fcc 6
+region              fluid block INF INF 2 6 INF INF units box
+create_atoms        1 region fluid units box
+mass 1 1.0
+group               fluid region fluid
+set                 group fluid type 1
+comm_modify vel yes
+write_data DPD.data
+#special_bonds dpd 1.0 1.0 1.0
+velocity            fluid create 1.0 38497 loop local dist gaussian
+#定义流体
+#pair_style          hybrid/overlay mdpd/rhosum mdpd 1.0 1.0 9872598
+#pair_coeff          1 1 mdpd/rhosum  0.75                              
+#pair_coeff          1 1 mdpd         -40 25 18.0 1.0 0.75  
+########################
+pair_style dpd 1.0 2.5 34387
+pair_coeff * * 3.0 1.0
+#粒子的质量
+mass                1 1.0
+dump       mydump  all atom 100 atom.lammpstrj
+#模拟设置不用改动
+compute             mythermo fluid temp
+thermo              100
+thermo_modify       temp mythermo flush yes
+fix        mvv     fluid mvv/dpd 
+
+#Dump 
+
+timestep            0.01
+#run 500000 #第一次run，系统达到静态平衡
+run 500
+#reset_timestep 0
+#dump       mydump  all atom 100 atom.lammpstrj
+#计算
+compute press all stress/atom NULL
+compute cc1 all chunk/atom bin/1d y 0.0 0.01 units box #划分一维网格统计压强分布
+#fix vel all ave/chunk 1 1000000 1000000 cc1c_press[1] c_press[2] c_press[3] norm sample file press.profile
+#run 1000000
+fix vel all ave/chunk 1 100 100 cc1 c_press[1] c_press[2] c_press[3] norm sample file press.profile
+run 500

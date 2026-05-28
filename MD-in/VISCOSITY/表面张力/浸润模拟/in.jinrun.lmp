@@ -1,0 +1,43 @@
+units metal
+boundary p p p 
+atom_style atomic
+neighbor 2 bin
+neigh_modify every 1 delay 0 
+timestep 0.001
+# 
+read_data 
+pair_style hybrid eam/fs tersoff lj/cut 1.0e
+pair_coeff * * eam/fs  Cu1.eam.fs NULL NULL Cu
+pair_coeff * * tersoff Si.C.tersoff C Si NULL
+pair_coeff 1 3 lj/cut  0.048658808 2.800759718
+pair_coeff 2 3 lj/cut  0.095209495 3.140957657
+#模拟信息输出
+thermo 100
+thermo_style custom step temp pe
+#底部原子分组设计
+region bot block INF INF INF INF INF 6 units box
+group bot region bot
+#温度初始化
+velocity all  create 300 8989
+#固定底部
+velocity bot set 0 0 0 
+fix 1 bot setforce 0 0 0
+#弛豫
+fix 2 all nvt temp 300 300 0.1 
+run 1000
+unfix 2
+reset_timestep 0 
+#升温
+dump 1 all atom 1000 hot.xyz
+fix 2 all npt temp 300 1500 0.1 iso 0 0 1 
+run 1000
+unfix 2
+undump 1
+reset_timestep 0
+# 密度云图，计算润湿角
+compute 1 all chunk/atom bin/2d x lower 2 z lower 2 units box
+fix 11 all ave/chunk 1 200 200 1 density/mass file density.txt
+#润湿1500K
+dump 1 all atom 200 dump.xyz
+fix 2 all nvt temp 1500 1500 0.1 
+run 30000 

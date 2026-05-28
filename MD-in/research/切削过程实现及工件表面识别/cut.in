@@ -1,0 +1,130 @@
+# in file for building a cutter
+# region units box is very very important
+
+echo              screen
+dimension         3
+units             metal          #A, ps, k, bar, g/mol
+boundary          f f p
+atom_style        atomic         # topo
+
+#=====    for C-dimamond
+#----------------------------------------------------------------------
+region            cut1 cylinder z  0.0  0.0 10 -3 3 units box 
+region            cut2 block    -10.0 10.0  0  20  -3 3 units box
+region            cut3 block    0  10 -10 20 -3 3 units box
+
+variable          x3 equal  -sin(PI*20.0/180)
+variable          y3 equal  cos(PI*20.0/180)
+region            cut4 plane 0 -10  0 ${x3} ${y3} 0.0 side in  units box
+
+variable          x4 equal  cos(PI*20.0/180)
+variable          y4 equal  -sin(PI*20.0/180)
+region            cut5 plane  -10.0 0.0 0.0 ${x4} ${y4} 0.0 side in units box
+
+region            u1 union 3 cut1 cut2 cut3 units box
+region            Cutter intersect 3 u1 cut4 cut5 units box
+#---------------------------------------------------------------------
+region            NL block    -59.5  -20.0  -44 0  -14.4 14.4 units box
+
+region            TL1 block   -70 -60 -45 0   -14.4 14.4 units box
+region            TL2 block   -70 -20 -55 -45   -14.4 14.4 units box
+region            TL union 2 TL1 TL2 units box
+
+region            BL1 block   -80 -70 -55 0   -14.4 14.4  units box
+region            BL2 block   -80 -20 -65 -55  -14.4 14.4  units box
+region            BL union 2 BL1 BL2 units box
+
+region            Copp union 3 NL TL BL units box
+
+region            box  union 2 Cutter Copp units box
+#----------------------------------------------------
+create_box        4  box 
+
+lattice           diamond 3.57   # C
+create_atoms      1  region Cutter units box
+
+lattice           fcc 3.60       # Cu
+create_atoms      2  region NL units box
+create_atoms      3  region TL units box
+create_atoms      4  region BL units box
+
+change_box        all x final -100 40 y final -100 50  units box 
+
+mass              1      12
+mass              2*4    64
+
+group             dao  type 1 #切割角
+group             nd   type 2 #受切部分
+group             hw   type 3 #中间
+group             bj   type 4 #边界
+group             fksd type 1 4 # 固定边界
+
+neighbor          0.3 bin
+neigh_modify      delay 10 check yes every 1 exclude group fksd fksd #one 20000 page 200000
+
+# interaction
+# C-C    tersoff
+# C-Cu   morse
+# Cu-Cu  EAM
+pair_style        hybrid tersoff morse 6.6  eam
+pair_coeff        * *   tersoff ./SiC.tersoff C NULL NULL NULL
+pair_coeff        2*4 2*4   eam ./Cu_u3.eam 
+pair_coeff        1 2*4  morse 0.1 1.7 2.2
+
+velocity          dao set 0.0 0.0 0.0  #切割部速度为0
+velocity          bj  set 0.0 0.0 0.0  #边界速度为0
+velocity          hw create 298 12345  #中间速度
+velocity          nd create 298 23456  #受切部速度
+
+write_data        1.data
+
+dump              a all custom 100 all.lammpstrj id type x y z
+compute           Thw hw temp
+compute           Tnd nd temp
+
+fix               10 bj nve/noforce     #边界不动
+fix               20 hw nve/limit 0.1   #中间NVT
+fix               21 hw temp/berendsen 298 298 1.0
+fix_modify        21 temp Thw               
+fix               30 nd nve/limit 0.1   #受切部NVT
+fix               31 nd temp/berendsen 298 298 1.0
+fix_modify        31 temp Tnd
+fix               40 dao move linear 0.0 0.0 0.0 #-0.5 0.0 0.0  切割部不动
+
+timestep          0.001
+
+thermo            100
+thermo_style      custom step ke pe temp
+thermo_modify     temp Thw lost ignore
+
+restart           100 equ.1 equ.2
+
+# run equilibrium 平衡第一阶段边界不动，中间和受切部NVT，并限定移动距离，切割部不动
+# 第二阶段，其它不变，取消限制
+run               200
+unfix             20
+unfix             30
+
+fix               20 hw nve #中间NVT
+fix               30 nd nve #受切NVT
+run               500
+
+unfix             20
+unfix             21
+unfix             30
+unfix             31
+
+# 切割开始 中间NVT，受切部NVE，刀具线性移动
+fix               20 hw  nvt temp 290 290 0.1 #中间NVT
+fix               30 nd  nve #受切NVE
+fix               40 dao move linear -1.0 0 0 #刀具开始线性运动     
+
+
+#dump              1 all custom  100 cu-c-1.lammpstrj id type x y z vx vy vz fx fy fz
+dump              2 all custom  100 cu-c-2.lammpstrj id type x y z 
+run               3000
+fix               40 dao move linear -0.2 0 0 
+run               100000
+write_restart     system.restart
+
+

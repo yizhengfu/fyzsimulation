@@ -1,0 +1,75 @@
+% 绘制真实力与预测力的对比图并进行线性回归分析
+
+% 假设results表已存在于工作区中
+% 如果没有，下面的代码将无法运行
+
+% 创建一个2x3的子图布局
+figure('Position', [100, 100, 1200, 800]);
+colors = {'r', 'g', 'b'};
+directions = {'X', 'Y', 'Z'};
+fits = cell(3, 1);  % 存储线性拟合结果
+
+for i = 1:3
+    % 获取当前方向的真实力和预测力
+    actual_force = results{:, i};        % fx, fy, 或 fz
+    predicted_force = results{:, i+3};   % pr_fx, pr_fy, 或 pr_fz
+    
+    % 创建子图
+    subplot(2, 3, i);
+    
+    % 绘制散点图
+    scatter(actual_force, predicted_force, 40, colors{i}, 'filled', 'MarkerFaceAlpha', 0.6);
+    hold on;
+    
+    % 添加理想预测线 (y=x)
+    min_val = min(min(actual_force), min(predicted_force));
+    max_val = max(max(actual_force), max(predicted_force));
+    plot([min_val, max_val], [min_val, max_val], 'k--', 'LineWidth', 1.5);
+    
+    % 线性回归
+    p = polyfit(actual_force, predicted_force, 1);
+    fits{i} = p;
+    
+    % 添加回归线
+    x_fit = linspace(min_val, max_val, 100);
+    y_fit = polyval(p, x_fit);
+    plot(x_fit, y_fit, colors{i}, 'LineWidth', 2);
+    
+    % 计算R²值
+    y_mean = mean(predicted_force);
+    SS_tot = sum((predicted_force - y_mean).^2);
+    y_est = polyval(p, actual_force);
+    SS_res = sum((predicted_force - y_est).^2);
+    R2 = 1 - SS_res/SS_tot;
+    
+    % 设置图表标题和标签
+    title(sprintf('%s方向力对比 (R² = %.4f)', directions{i}, R2));
+    xlabel(sprintf('实际力 F_%s', lower(directions{i})));
+    ylabel(sprintf('预测力 pr\\_F_%s', lower(directions{i})));
+    grid on;
+    
+    % 添加回归方程文本
+    equation = sprintf('y = %.4fx + %.4f', p(1), p(2));
+    text(min_val + 0.1*(max_val-min_val), max_val - 0.1*(max_val-min_val), equation, 'FontSize', 10);
+    
+    % 在下面的子图绘制残差图
+    subplot(2, 3, i+3);
+    residuals = predicted_force - y_est;
+    
+    % 绘制残差散点图
+    scatter(actual_force, residuals, 40, colors{i}, 'filled', 'MarkerFaceAlpha', 0.6);
+    hold on;
+    
+    % 添加零线
+    plot([min_val, max_val], [0, 0], 'k--', 'LineWidth', 1.5);
+    
+    % 设置残差图标题和标签
+    title(sprintf('%s方向的残差分析', directions{i}));
+    xlabel(sprintf('实际力 F_%s', lower(directions{i})));
+    ylabel('残差 (预测值 - 拟合值)');
+    grid on;
+end
+
+% 调整子图间距
+sgtitle('三个方向力的实际值与预测值对比及线性回归分析', 'FontSize', 14);
+set(gcf, 'Color', 'w');

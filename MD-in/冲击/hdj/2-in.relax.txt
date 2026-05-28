@@ -1,0 +1,167 @@
+#fyz-2023-2-16-1 加入bond的限制，所以在读data文件时，需要1、修改data中bond type为1；2、除了atoms、bond coeff 外其余全删除；3、修改bond 中第二列为1 &
+#如果要为bullet增加原子种类，则1、atom type +1；2、atom mass 需要添加。
+variable filename    index push_slab    #层模型文件
+variable modelname   index relax_slab   
+variable vThermostep equal 10
+variable vFrestep    equal 10         #Dump1步长
+variable vNVEStep    equal 1       #平衡NVE时间
+variable vNVTStep    equal 1       #平衡NVT时间
+variable vTemp       equal 300   	   #能量大小
+variable vdt         equal 0.1
+variable vEnergy1    equal 300 
+variable vEnergy2    equal 200
+variable vEnergy3    equal 100
+variable vEnergy4    equal 0.0 #0
+variable vPush       equal 1             #单位为MPa 施加压缩时候的压力
+#=========================== 模拟基本参数 ==============================
+log log.relax.txt
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+neighbor        2.5 bin
+neigh_modify    every 10 delay 0 check no
+#===============    读取模型文件并分组(合并环氧和石墨烯) ================
+read_data       ${filename}.data   
+#===========================  势函数设置 ================================
+pair_style      reax/c  NULL       
+pair_coeff 		* * S09270256.txt C N H H S O N N O C C C C O H C C C C
+fix   			q all qeq/reax 1 0.0 10.0 1e-6 reax/c        #电荷平衡
+fix             bonds all reax/c/bonds 10 bonds.reax                   #qwh 小程序所需文件
+#===========================loop Energy===========================
+#label          loopEnergy
+shell           mkdir ${vEnergy1}Kcalmol
+shell           cd ${vEnergy1}Kcalmol
+bond_style 		harmonic
+bond_coeff 		1 ${vEnergy1} 1.2          #在弛豫的过程中不断减小bond_coeff的能量项逐渐消除约束的强度直到完全消除约束，然后写出data文件
+special_bonds 	lj/coul 1.0 1.0 1.0
+#================group
+#================group
+#================group
+group           TGra type 16                #必须根据具体的原子类型进行修改
+group           BGra type 18                #必须根据具体的原子类型进行修改
+#=========================== 能量最小化 ============================
+velocity        TGra set 0.0 0.0 0.0 units box #固定顶部石墨烯
+velocity        BGra set 0.0 0.0 0.0 units box #固定底部石墨烯
+fix             1 TGra setforce  0.0 0.0 0.0  
+fix 			2 BGra setforce  0.0 0.0 0.0
+timestep        ${vdt}            
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 初始化 ============================
+velocity        all create ${vTemp} 5812775 dist gaussian loop geom   #设置层模型得随机速度，温度300K
+velocity        TGra set 0.0 0.0 0.0 units box #固定顶部石墨烯
+velocity        BGra set 0.0 0.0 0.0 units box #固定底部石墨烯
+variable        tmqx equal "lx"
+variable        tmqy equal "ly"
+variable        vArea equal ${tmqx}*${tmqy}
+variable  		vForce equal 0.14393*0.001*${vPush}*${vArea}    #pressure压强=F压力/S面积  1eV/Angstrom3=160.21766208GPa(网上的公式)  
+fix 			ts TGra setforce  0.0 0.0 NULL
+fix 			ta TGra aveforce  NULL NULL -${vForce}
+fix 			bs BGra setforce  0.0 0.0 NULL
+fix 			ba BGra aveforce  NULL NULL ${vForce}
+thermo          ${vThermostep}                                                    #每隔10步在屏幕上输出模拟信息,输出体系信息
+thermo_style    custom  step pe ke etotal temp lx ly lz press atoms vol
+compute         cTall   all temp
+thermo_modify   temp    cTall flush yes lost ignore 
+#=========================== 平衡 ============================
+dump 			 1 all custom ${vFrestep} ${filename}_${vEnergy1}Kcalmol.lammpstrj id type x y z element mass	  #轨迹文件输出		 
+dump_modify 	 1 sort id element  C N H H S O N N O C C C C O H C C C C
+fix              1 all  nve/limit 0.1 #nve                                  
+run              ${vNVEStep}
+write_data       ${filename}_${vEnergy1}Kcalmol.data									 
+write_restart    ${filename}_${vEnergy1}Kcalmol.restar
+unfix            1
+#---------------------------------------------------------------
+fix              1 all nve                                            #nvt，并用langevin控温
+fix	             2 all langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+fix_modify       2 temp cTall
+run              ${vNVTStep} 
+write_data       ${filename}_${vEnergy1}Kcalmol_EquNVT.data		          							 
+write_restart 	 ${filename}_${vEnergy1}Kcalmol_EquNVT.restar
+unfix            1
+unfix            2
+shell            cd ../
+#第二次---------------------------------------------------------------
+shell           mkdir ${vEnergy2}Kcalmol
+shell           cd ${vEnergy2}Kcalmol
+bond_style 		harmonic
+bond_coeff 		1 ${vEnergy2} 1.2          #在弛豫的过程中不断减小bond_coeff的能量项逐渐消除约束的强度直到完全消除约束，然后写出data文件
+special_bonds 	lj/coul 1.0 1.0 1.0
+#=========================== 能量最小化 ============================       
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 平衡 ============================
+fix              1 all  nve/limit 0.1#nve                                  
+run              ${vNVEStep}
+write_data       ${filename}_${vEnergy2}Kcalmol.data									 
+write_restart    ${filename}_${vEnergy2}Kcalmol.restar
+unfix            1
+#---------------------------------------------------------------
+fix              1 all nve                                            #nvt，并用langevin控温
+fix	             2 all langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+fix_modify       2 temp cTall
+run              ${vNVTStep} 
+write_data       ${filename}_${vEnergy2}Kcalmol_EquNVT.data		          							 
+write_restart 	 ${filename}_${vEnergy2}Kcalmol_EquNVT.restar
+unfix            1
+unfix            2
+shell            cd ../
+#---------------------------------------------------------------
+#第三次---------------------------------------------------------------
+shell           mkdir ${vEnergy3}Kcalmol
+shell           cd ${vEnergy3}Kcalmol
+bond_style 		harmonic
+bond_coeff 		1 ${vEnergy3} 1.2          #在弛豫的过程中不断减小bond_coeff的能量项逐渐消除约束的强度直到完全消除约束，然后写出data文件
+special_bonds 	lj/coul 1.0 1.0 1.0
+#=========================== 能量最小化 ============================       
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 平衡 ============================
+fix              1 all  nve/limit 0.1#nve                                  
+run              ${vNVEStep}
+write_data       ${filename}_${vEnergy3}Kcalmol.data									 
+write_restart    ${filename}_${vEnergy3}Kcalmol.restar
+unfix            1
+#---------------------------------------------------------------
+fix              1 all nve                                            #nvt，并用langevin控温
+fix	             2 all langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+fix_modify       2 temp cTall
+run              ${vNVTStep} 
+write_data       ${filename}_${vEnergy3}Kcalmol_EquNVT.data		          							 
+write_restart 	 ${filename}_${vEnergy3}Kcalmol_EquNVT.restar
+unfix            1
+unfix            2
+shell            cd ../
+#---------------------------------------------------------------
+#第四次---------------------------------------------------------------
+shell           mkdir ${vEnergy4}Kcalmol
+shell           cd ${vEnergy4}Kcalmol
+bond_style 		harmonic
+bond_coeff 		1 ${vEnergy4} 1.2          #在弛豫的过程中不断减小bond_coeff的能量项逐渐消除约束的强度直到完全消除约束，然后写出data文件
+special_bonds 	lj/coul 1.0 1.0 1.0
+#=========================== 能量最小化 ============================       
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 平衡 ============================
+fix              1 all  nve/limit 0.1#nve                                  
+run              ${vNVEStep}
+write_data       ${filename}_${vEnergy4}Kcalmol.data									 
+write_restart    ${filename}_${vEnergy4}Kcalmol.restar
+unfix            1
+#---------------------------------------------------------------
+fix              1 all nve                                            #nvt，并用langevin控温
+fix	             2 all langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+fix_modify       2 temp cTall
+run              ${vNVTStep}   
+delete_atoms     group TGra  #删除多余的顶层石墨烯
+delete_atoms     group BGra  #删除多余的底层石墨烯
+reset_atom_ids   sort yes
+write_data       ${filename}_${vEnergy4}Kcalmol_EquNVT.data		          							 
+write_restart 	 ${filename}_${vEnergy4}Kcalmol_EquNVT.restar
+unfix            1
+unfix            2
+shell            cd ../
+#---------------------------------------------------------------
+print "All done"

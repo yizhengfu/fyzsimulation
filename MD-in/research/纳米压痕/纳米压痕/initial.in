@@ -1,0 +1,47 @@
+###############################################################
+###         输入文件intial.in                                ###
+###         建模时需要将基体材料分为牛顿层、恒温层、固定层     ###
+#############################################################
+#---------------------------------------全局设置-------------------------
+dimension	    3
+units		    metal 
+boundary	    p p f
+atom_style	    atomic
+########################################################################
+#---------------------------------------建模----------------------------
+variable        a equal 3.615   #晶格常数值
+variable        lx equal 220    #盒子           
+variable        ly equal 220    #三个方向 
+variable        lz equal 400    #大小
+
+###创建盒子
+lattice	        fcc $a orient x 1 0 0 orient y 0 1 0 orient z 0 0 1
+region		    box block 0.0 ${lx} 0 ${lx} 0.0 ${lz} units box
+create_box	    4 box
+###创建基体原子
+region		    boundary_layer_down block INF INF INF INF INF 20 units box
+region		    thermostat_layer block INF INF INF INF 20 40.0 units box
+region		    newtonian_layer block INF INF INF INF 40 220 units box
+region		    substracte union 3 boundary_layer_down thermostat_layer newtonian_layer	units box
+create_atoms	1 region substracte units box
+###创建压头原子（这里的纳米压痕用的是实际压头）
+lattice	        diamond 3.57 	
+region		    indent sphere 110 110 280 50 units box
+create_atoms	4 region indent units box
+###设定原子质量
+mass		    1 63.55         #Cu
+mass		    2 63.55         #Cu
+mass		    3 63.55         #Cu
+mass		    4 12.01         #C
+#----------------------------------------划分组----------------------------------
+group		    boundary_layer_down region boundary_layer_down
+group		    thermostat_layer region thermostat_layer
+group		    newtonian_layer region newtonian_layer
+group		    tool region indent
+
+set		        group boundary_layer_down type 1
+set		        group thermostat_layer type 2
+set		        group newtonian_layer type 3
+set		        group tool type 4
+
+write_data      intial.data

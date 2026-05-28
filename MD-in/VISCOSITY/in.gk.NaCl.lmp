@@ -1,0 +1,115 @@
+#NaCl的粘度
+units real
+dimension 3
+boundary p p p
+neighbor 3.0 bin
+neigh_modify every 1 delay 0 check yes
+#Forcefield
+atom_style charge
+pair_style born/coul/long 10.0 8.0
+kspace_style pppm 10e-4
+#模拟盒子
+region box block -40 40 -40 40 -40 40 units box
+create_box 2 box
+lattice sc 4
+region part1 block -40 40 -40 40 -40 -4.0 units box #胆子够大，直接将Na和Cl分开
+create_atoms 1 region part1
+lattice sc 4
+region part2 block -40 40 -40 40 0.0 40 units box
+create_atoms 2 region part2
+#Na = 1 Cl = 2
+#Pair_coeff
+pair_coeff 1 1 6.0772 0.3167 2.340 24.164 11.5076 
+pair_coeff 1 2 4.8617 0.3167 2.755 161.1 199.93
+pair_coeff 2 2 3.6462 0.3267 3.170 1729.64 3473.65 
+#Charge
+set type 1 charge 1.0
+set type 2 charge -1.0
+#Mass
+mass 1 22.9898
+mass 2 35.45
+#MM
+minimize 0.0 1.0e-8 1000 100000
+#Dump
+dump mydump all atom 1000 atom.lammpstrj
+timestep 1.0
+thermo 1000
+thermo_style custom step temp density
+thermo_modify flush yes
+#在将热力学信息写入屏幕和日志文件后，flush关键字调用刷新操作。这确保了输出被更新，而不是(由应用程序)缓冲，即使LAMMPS在模拟完成之前停止。
+#请注意，这不会影响操作系统或设备的缓冲，所以如果由于硬件故障而导致模拟停止，您可能仍然会丢失数据。
+#平衡 100 个大气压
+velocity all create 1200 5645354 loop local dist gaussian
+fix fxnpt all npt temp 1200 1200 100 iso 100 100 1000 #为啥要施加这么大的大气压
+run 100000
+unfix fxnpt
+#平衡 1个大气压
+fix fxnpt all npt temp 1200 1200 100 iso 1.0 1.0 1000
+run 1000#100000
+unfix fxnpt
+#单位换算
+variable    dt equal 1.0 #
+variable    kB equal 1.3806504e-23 # 玻尔兹曼常数 =1.380649 × 10-23 m2 kg s-2 K-1
+variable    g_mol2kg equal 1.0e-3/6.02214e23 #单位g/mol到Kg
+variable    A2m equal 1.0e-10  #单位A到m
+variable    fs2s equal 1.0e-15 #单位fs到s
+variable    atm2pa equal 1.01325e5 #1个大气压=1.01e5 pa，1个标准大气压等于101325帕
+variable    convert_eta equal ${atm2pa}*${atm2pa}*${A2m}*${A2m}*${A2m}*${fs2s}
+#粘度单位，charge类型的单位转化为其单位在厘米·克·秒(c·g·s)制中为泊(g·cm -1·s -1)，
+#在LAMMPS中，通常使用的压力单位是"atm"（大气压力）。但是，在国际单位制（SI）中，压力的单位是帕斯卡（Pa）。
+#为了将LAMMPS中的压力单位转换为SI单位，需要使用适当的换算因子。
+#一个大气压力（atm）等于101325帕斯卡（Pa）。因此，为了将LAMMPS中的单位转换为SI单位，需要乘以${atm2Pa}的换算因子两次，
+#因为一个atm等于${atm2Pa}帕斯卡，再乘以${atm2Pa}就相当于进行两次换算，将LAMMPS中的压力单位转换为SI单位。
+#所以，使用${atm2Pa}*${atm2Pa}是因为需要两次乘以${atm2Pa}来完成从atm到Pa的单位转换，确保正确的单位转换。
+#在SI制中为帕斯卡·秒(Pa·s或kg·m -1·s -1)，1泊=0.1帕·秒。
+#处理比较巧妙，无量纲，先不管单位，最后根据粘度单位，直接乘以单位因子
+#Pa^2*m^3*s
+variable    kCal2J equal 4186.0/6.02214e23 #real单位是kal/mol,所以转J 1kal=4184J
+variable    convert_kappa equal ${kCal2J}/${fs2s}/${A2m} #J/(s*m)
+variable    convert_rho equal 1000
+reset_timestep 0
+variable    p equal 2000     # correlation length
+variable    s equal 5        # sample interval 一般取5
+variable    d equal $p*$s    # dump interval 
+thermo          $d
+variable         pxy equal pxy
+variable         pxx equal pxx-press
+variable         pxz equal pxz
+variable         pzz equal pzz-press
+variable         pyz equal pyz
+variable         pyy equal pyy-press
+fix              SS all ave/correlate $s $p $d v_pxy v_pxx v_pxz v_pzz v_pyz v_pyy type auto file profile.gk ave running
+#自相关函数
+variable         scale equal 1.0/1200/${kB}*vol*$s*dt ##1/1200(温度)/Kb(玻尔兹曼)*体积(vol)*时间（$s*dt）间隔*步长
+variable         diagfac equal 2-2/3
+# Diagonal components of SS are larger by factor 2-2/d,
+# which is 4/3 for d=3, but 1 for d=2.
+# See Daivis and Evans, J.Chem.Phys, 100, 541-547 (1994)
+variable         vxy equal trap(f_SS[3])*${scale}*${convert_eta}
+variable         vxx equal trap(f_SS[4])*${scale}/${diagfac}*${convert_eta}
+variable         vxz equal trap(f_SS[5])*${scale}*${convert_eta}
+variable         vzz equal trap(f_SS[6])*${scale}/${diagfac}*${convert_eta}
+variable         vyz equal trap(f_SS[7])*${scale}*${convert_eta}
+variable         vyy equal trap(f_SS[8])*${scale}/${diagfac}*${convert_eta}
+#6个方向的值
+fix fxnvt all nvt temp 1200 1200 100.0
+
+thermo_style     custom step temp press pxy pxz pyz v_vxy v_vxx v_vxz v_vzz v_vyz v_vyy
+thermo_modify flush yes
+
+run              1000#100000
+
+unfix SS
+#reset_timestep  0
+
+compute         msd all msd com yes
+variable        twopoint equal c_msd[4]/6/(step*dt+1.0e-6)
+fix             9 all vector 10 c_msd[4]
+variable        fitslope equal slope(f_9)/6/(10*dt)
+
+thermo          1000
+thermo_style  custom step temp c_msd[4] v_twopoint v_fitslope
+thermo_modify flush yes
+
+run 1000#100000
+

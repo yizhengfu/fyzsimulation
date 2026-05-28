@@ -1,0 +1,297 @@
+###########	Multi-aspeirty conact MD input script	########## ##########################################################
+variable vNevery	equal 1
+variable vNrepeat	equal 100
+variable vNfreq	    equal 500
+variable vThermoStep	equal 2000	#	Thermo output step 
+variable vRestartStep	equal 50000	#	Restart file output step 
+variable vDumpCustomStep equal 20000  #	DumpCustom output step 
+variable vDumpDcdStep equal 20000	#	DumpDcd output step ？
+variable vFixStep	equal 100000 
+variable vPushStepLimit equal 100000 
+variable vPushStep	 equal 100000 
+variable vShearStep  equal 1300000
+variable vEpFe_input equal 0.04097908395*0.5 # Fe LJ epsilon parameter 
+variable vReadData_input string Fe_rms8_seed3_C16_0250.lammps05 # Data file 
+##################################################################### 
+# 250MPa = 0.0063607480
+# 500MPa = 0.0127214960 
+# 750MPa = 0.0190822440 
+#1000MPa  = 0.0254429920
+###############	loopForce	############################
+variable vForce index 0.0127214960 # External load 
+label	 forloopforce
+###############	loopShear	#############################
+variable vShear index 0.1 # (0.1 Angstroms/picosecond = 10m/s ) sliding speed 
+label	 forloopshear
+###############	looptemp	#############################
+variable vTemp index 300 # Temp 300K
+label	 forlooptemp 
+##################################################
+clear
+dimension	3
+boundary	p p s
+units	    metal
+atom_style	full
+neighbor	2.0 bin
+neigh_modify every 1 delay 5 check yes 
+############ PAIRE ############
+pair_style hybrid eam/fs lj/cut 10 
+pair_modify shift yes mix arithmetic 
+bond_style harmonic
+angle_style harmonic 
+dihedral_style newopls
+############# READ DATA ########
+read_data	${vReadData_input} 
+############# MASS #############
+mass	1	15.03515	# CH3
+mass	2	14.02715	# CH2
+mass	3	55.84700	# LOW FIXED
+mass	4	55.84700	# LOW THERMO
+mass	5	55.84700	# LOW ASP
+mass	6	55.84700	# Hi ASP
+mass	7	55.84700	# Hi THERMO
+mass	8	55.84700	# Hi FIXED
+############### DEFINE GROUP ################
+group	gFlow	type 1 2
+group	gLoFix	type 3
+group	gLoWaMob type 4
+group	gLoAsp	type 5
+group	gHiFix	type 8
+group	gHiWaMob type 7
+group	gHiAsp type 6
+group	gHiWall		union gHiFix gHiWaMob gHiAsp 
+group	gLoWall		union gLoFix gLoWaMob gLoAsp 
+group	gWall	    union gHiWall gLoWall
+group	gHiFixHiWaMob union gHiFix gHiWaMob 
+group	gLoFixLoWaMob union gLoFix gLoWaMob
+group	gBd union gHiFix gLoFix
+group	gAsp union gHiAsp gLoAsp ##GROUPS FOR SPECIFIC CALCULATION##
+group	gAllexBd subtract all gBd
+group	gHiWallexHiFix subtract gHiWall gHiFix 
+group   gLoWallexLoFix subtract gLoWall gLoFix #groups for group/group calculation
+group	gAllexHiFixHiWaMob subtract all gHiFixHiWaMob 
+group	gAllexHiFix subtract all gHiFix
+group	gAllexLoFixLoWaMob subtract all gLoFixLoWaMob 
+group	gAllexLoFix subtract all gLoFix
+group	gAllexHiWall subtract all gHiWall 
+############# VARIABLE FOR PAIR ################## ################# Wall
+variable vEpFe	equal ${vEpFe_input} 
+variable vSigFe equal 2.321 ################ Flow
+##water
+variable vEpOw equal 0.007058 
+variable vSigOw equal 3.164350 
+variable vEpHw equal 0.000000 
+variable vSigHw equal 0.000000 
+##polymer
+variable vEpCH3 equal 0.0084449 
+variable vSigCH3 equal 3.7500000 
+variable vEpCH2 equal 0.0039639 
+variable vSigCH2 equal 3.9500000
+############## Fe CH3 CH2 ##################
+variable vEpFeCH3 equal (${vEpFe}*${vEpCH3})^0.5 
+variable vSigFeCH3 equal (${vSigFe}+${vSigCH3})/2 
+variable vEpFeCH2 equal (${vEpFe}*${vEpCH2})^0.5 
+variable vSigFeCH2 equal (${vSigFe}+${vSigCH2})/2 
+############# Fe WATER ####################
+variable vEpFeOw equal (${vEpOw}*${vEpFe})^0.5 
+variable vSigFeOw equal (${vSigOw}+${vSigFe})/2 
+variable vEpFeHw equal (${vEpHw}*${vEpFe})^0.5 
+variable vSigFeHw equal (${vSigHw}+${vSigFe})/2 
+############ CH3 CH2 WATER ################
+variable vEpOwCH3 equal (${vEpOw}*${vEpCH3})^0.5 
+variable vSigOwCH3 equal (${vSigOw}+${vSigCH3})/2
+variable vEpOwCH2 equal (${vEpOw}*${vEpCH2})^0.5 
+variable vSigOwCH2 equal (${vSigOw}+${vSigCH2})/2
+variable vEpHwCH3 equal (${vEpHw}*${vEpCH3})^0.5 
+variable vSigHwCH3 equal (${vSigHw}+${vSigCH3})/2 
+variable vEpHwCH2 equal (${vEpHw}*${vEpCH2})^0.5 
+variable vSigHwCH2 equal (${vSigHw}+${vSigCH2})/2 
+############# PAIR COEFF	####
+pair_coeff	* * eam/fs /home/xz992/lammps-31Aug11/potentials/Fe_mm.eam.fs NULL NULL Fe Fe Fe Fe Fe Fe
+pair_coeff	1 1	lj/cut ${vEpCH3} ${vSigCH3} #CH3 CH3 
+pair_coeff	2 2	lj/cut ${vEpCH2} ${vSigCH2} #CH2 CH2 
+pair_coeff	1 3*8 lj/cut ${vEpFeCH3} ${vSigFeCH3} #CH3 Fe 
+pair_coeff	2 3*8 lj/cut ${vEpFeCH2} ${vSigFeCH2} #CH2 Fe
+pair_coeff	5 6	lj/cut ${vEpFe} ${vSigFe} 10.0 ############# BOND COEFF ####
+bond_coeff	1 19.51397 1.54
+bond_coeff	2 19.51397 1.54
+############# ANGLE COEFF ####
+angle_coeff	1 2.692920 114.00
+angle_coeff	2 2.692920 114.00
+############# DIHEDRAL COEFF####
+dihedral_coeff 1 0.061188 -0.011752 0.136381 0 # k4 for constant
+dihedral_coeff 2 0.061188 -0.011752 0.136381 0 # k4 for constant 
+############# MINIMIZE NOT FOR RESTART ####################
+minimize	1.0e-4 1.0e-6 1000 10000
+reset_timestep	0
+############## INITIAL TEMP NOT FOR RESTART #################
+velocity all create ${vTemp} 4928459 dist gaussian loop geom 
+velocity gBd set 0.0 0.0 0.0 units box
+
+timestep0.002
+variable vStep equal step #################################################################
+#########  All Dimension	########## #################################################################
+variable vDxminAll equal bound(all,xmin) 
+variable vDxmaxAll equal bound(all,xmax) 
+variable vDyminAll equal bound(all,ymin) 
+variable vDymaxAll equal bound(all,ymax) 
+variable vDzminAll equal bound(all,zmin) 
+variable vDzmaxAll equal bound(all,zmax)
+variable vLenXdAll equal (v_vDxmaxAll-v_vDxminAll) 
+variable vLenYdAll equal (v_vDymaxAll-v_vDyminAll) 
+variable vLenZdAll equal (v_vDzmaxAll-v_vDzminAll)
+#################################################################
+#########  Flow Dimension	########## #################################################################
+variable vDxminFlow equal bound(gFlow,xmin) 
+variable vDxmaxFlow equal bound(gFlow,xmax)
+
+variable vDyminFlow equal bound(gFlow,ymin) 
+variable vDymaxFlow equal bound(gFlow,ymax) 
+variable vDzminFlow equal bound(gFlow,zmin) 
+variable vDzmaxFlow equal bound(gFlow,zmax)
+variable vLenXdFlow equal (v_vDxmaxFlow-v_vDxminFlow) 
+variable vLenYdFlow equal (v_vDymaxFlow-v_vDyminFlow) 
+variable vLenZdFlow equal (v_vDzmaxFlow-v_vDzminFlow) 
+##temp for gHiWallexHiFix gLoWallexLoFix
+compute	cT3dProHiWallexHiFix gHiWallexHiFix temp/profile 1 1 1 xyz 1 1 1
+compute	cT3dProLoWallexLoFix gLoWallexLoFix temp/profile 1 1 1 xyz 1 1 1 
+##temp for gHiWaMob gLoWaMob
+compute	cT3dProHiWaMob gHiWaMob temp/profile 1 1 1 xyz 1 1 1
+compute	cT3dProLoWaMob gLoWaMob temp/profile 1 1 1 xyz 1 1 1 
+##temp for gHiAsp gLoAsp
+compute	cT3dProHiAsp gHiAsp temp/profile 1 1 1 xyz 1 1 1
+compute	cT3dProLoAsp gLoAsp temp/profile 1 1 1 xyz 1 1 1 
+##temp for gFlow
+compute	cT3dProFlow gFlow temp/profile 1 1 1 xyz 10 10 5 ##################################################
+############### compute group/group ############# ##################################################
+##FORCE ON gHiWall
+compute	cfHiWall5	gHiWall	group/group gAllexHiWall 
+##FORCE ON gHiFixHiWaMob
+compute	cfHiFixHiWaMob5	gHiFixHiWaMob group/group gAllexHiFixHiWaMob
+##FORCE ON gFlow from gFlow
+compute	cfFlow5Flow	gFlow	group/group gFlow ##################################################
+############# compute stress/atom ############### ##################################################
+#All
+compute	cStAtAll	all	stress/atom virial
+compute	cStAtFlow	gFlow stress/atom virial
+compute	cStAtWall	gWall stress/atom virial
+variable vVonMisesAll	atom sqrt(((c_cStAtAll[1]-c_cStAtAll[2])^2+(c_cStAtAll[1]- c_cStAtAll[3])^2+(c_cStAtAll[2]- c_cStAtAll[3])^2+6.0*(c_cStAtAll[4]^2+c_cStAtAll[5]^2+c_cStAtAll[6]^2))/2)
+variable vVonMisesWall atom sqrt(((c_cStAtWall[1]-c_cStAtWall[2])^2+(c_cStAtWall[1]- c_cStAtWall[3])^2+(c_cStAtWall[2]- c_cStAtWall[3])^2+6.0*(c_cStAtWall[4]^2+c_cStAtWall[5]^2+c_cStAtWall[6]^2))/2)
+variable vVonMisesFlow	atom sqrt(((c_cStAtFlow[1]- c_cStAtFlow[2])^2+(c_cStAtFlow[1]-c_cStAtFlow[3])^2+(c_cStAtFlow[2]- c_cStAtFlow[3])^2+6.0*(c_cStAtFlow[4]^2+c_cStAtFlow[5]^2+c_cStAtFlow[6]^2))/2)
+
+##################################################
+############# compute lattice	############### ##################################################
+#cna/atom
+compute	cCnaWall gWall cna/atom 3.446376068 # BCC:1.207*2.855324 ##################################################
+#############	compute energe ############### ##################################################
+compute	cPeAtAll all pe/atom
+compute	cKeAtAll all ke/atom
+compute	cPeAtFlow gFlow pe/atom pair
+compute cRedPeFlow gFlow reduce sum c_cPeAtFlow 
+############################################################ #############	OUTPUT	############################## ############################################################ ############################################################ ##########		TEMP	############################## ############################################################
+fix	fAveTiAllTemp all	ave/time ${vNevery} ${vNrepeat} ${vNfreq} c_cT3dProFlow c_cT3dProLoAsp c_cT3dProHiAsp c_cT3dProHiWaMob c_cT3dProLoWaMob ave one file output_temp.PushForce${vForce}_Shear${vShear}_Temp${vTemp} ############################################################
+##########	Flow	################################## ############################################################
+fix	fAvtTiFlow	all	ave/time ${vNevery} ${vNrepeat} ${vNfreq} v_vLenZdAll v_vLenZdFlow c_cRedPeFlow c_cfFlow5Flow c_cfFlow5Flow[1] c_cfFlow5Flow[2] c_cfFlow5Flow[3] ave one file output_flow_data.PushForce${vForce}_Shear${vShear}_Temp${vTemp} ############################################################
+#########	HiWall	############################## ############################################################
+fix	fAveTiHiWall all	ave/time ${vNevery} ${vNrepeat} ${vNfreq} c_cfHiWall5[1] c_cfHiWall5[2] c_cfHiWall5[3] ave one file output_force_HiWall.PushForce${vForce}_Shear${vShear}_Temp${vTemp} ############################################################
+#########	HiFixHiWaMob	############# ############################################################
+fix	fAveTiHiFixHiWaMob all	ave/time ${vNevery} ${vNrepeat} ${vNfreq} c_cfHiFixHiWaMob5[1] c_cfHiFixHiWaMob5[2] c_cfHiFixHiWaMob5[3] ave one file output_force_HiFixHiWaMob.PushForce${vForce}_Shear${vShear}_Temp${vTemp} ############################################################
+##########	fix ave/atom	################## ############################################################
+fix	fAveAtom all	ave/atom ${vNevery} ${vNrepeat} ${vNfreq} vx vy vz c_cPeAtAll c_cKeAtAll c_cStAtAll[1] c_cStAtAll[2] c_cStAtAll[3] c_cStAtAll[4] c_cStAtAll[5] c_cStAtAll[6] v_vVonMisesAll v_vVonMisesFlow v_vVonMisesWall
+fix	fAveAtomLoAsp	gLoAsp	ave/atom ${vNevery} ${vNrepeat} ${vNfreq} x y z vx vy vz fx fy fz
+fix	fAveAtomHiAsp	gHiAsp	ave/atom ${vNevery} ${vNrepeat} ${vNfreq} x y z vx vy vz fx fy fz
+fix	fAveAtomFlow  gFlow	ave/atom ${vNevery} ${vNrepeat} ${vNfreq} x y z vx vy vz fx fy fz
+##################################################### ############ layer's property ############################ #####################################################
+fix	fSpaFlow gFlow ave/spatial	${vNevery} ${vNrepeat} ${vNfreq} x 0.0 1.0 y 0.0 1.0 z 0.0 0.02 vx vy vz density/mass density/number units reduced norm sample ave one file output_flow_Zlays.PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+fix	fSpaFlow_long	gFlow	ave/spatial	1 325000 325000 x 0.0 1.0 y 0.0 1.0 z 0.0 0.02 vx vy vz density/mass density/number units reduced norm sample ave one file output_flow_Zlays_long.PushForce${vForce}_Shear${vShear}_Temp${vTemp} ####################################################################### ###############	THERMO OUTPUT	############################# #######################################################################
+thermo	${vThermoStep}
+restart	${vRestartStep} restart.*.PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump	dumpAllCustom all custom ${vDumpCustomStep} output_DumpAllCustom.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpstrj id type xu yu zu f_fAveAtom[1] f_fAveAtom[2] f_fAveAtom[3] f_fAveAtom[4] f_fAveAtom[5] f_fAveAtom[6] f_fAveAtom[7] f_fAveAtom[8] f_fAveAtom[9] f_fAveAtom[10] f_fAveAtom[11] f_fAveAtom[12] f_fAveAtom[13] f_fAveAtom[14] c_cCnaWall
+dump_modify	dumpAllCustom format "%6d %6d %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g % 12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g"
+dump_modify	dumpAllCustom sort id 
+dump dumpLoAspCustom gLoAsp custom ${vDumpCustomStep} output_DumpLoAspCustom.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpstrj id type x y z f_fAveAtomLoAsp[4] f_fAveAtomLoAsp[5] f_fAveAtomLoAsp[6] f_fAveAtomLoAsp[7] f_fAveAtomLoAsp[8] f_fAveAtomLoAsp[9] f_fAveAtom[8] 
+dump_modify	dumpLoAspCustom format "%6d %6d %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g" sort id
+dump dumpHiAspCustom gHiAsp custom ${vDumpCustomStep} output_DumpHiAspCustom.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpstrj id type x y z f_fAveAtomHiAsp[4] f_fAveAtomHiAsp[5] f_fAveAtomHiAsp[6] f_fAveAtomHiAsp[7] f_fAveAtomHiAsp[8] f_fAveAtomHiAsp[9] f_fAveAtom[8]
+dump_modify	dumpHiAspCustom format "%6d %6d %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g" sort id
+dump	dumpFlowCustom gFlow custom ${vDumpCustomStep} output_DumpFlowCustom.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpstrj id type x y z f_fAveAtomFlow[4] f_fAveAtomFlow[5] f_fAveAtomFlow[6] f_fAveAtomFlow[7] f_fAveAtomFlow[8] f_fAveAtomFlow[9] f_fAveAtom[8]
+dump_modify	dumpFlowCustom format "%6d %6d %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g %12.6g" sort id
+dump dumpAllDcdUnWrap all dcd ${vDumpDcdStep} output_DumpAllDcdUnWrap.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.dcd 
+dump_modify	dumpAllDcdUnWrap unwrap yes
+dump dumpAllDcdWrap all dcd ${vDumpDcdStep} output_DumpAllDcdWrap.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.dcd
+## ----------------FIX NO PUSH JUST RELEX	
+#固定层不动，Fe层NVT 中间聚合物NVE，Why？？？
+#velocity all create ${vTemp} 4928459 dist gaussian loop geom 
+#velocity gBd set 0.0 0.0 0.0 units box
+fix	fSetFoHiFix gHiFix setforce 0.0 0.0 0.0
+fix	fSetFoLoFix gLoFix setforce 0.0 0.0 0.0
+fix	fNveBd gBd nve         ###保证gBd 静止不动
+fix	fNvtHiWallexHiFix gHiWallexHiFix nvt temp ${vTemp} ${vTemp} 0.1 #上层Fe能动的，HiwaMob，HiAsp NVT
+fix_modify	fNvtHiWallexHiFix temp cT3dProHiWallexHiFix
+fix	fNvtLoWallexLoFix gLoWallexLoFix nvt temp ${vTemp} ${vTemp} 0.1 #下层Fe能动的，HiwaMob，HiAsp NVT
+fix_modify	fNvtLoWallexLoFix temp cT3dProLoWallexLoFix
+fix	fNveFlow gFlow nve
+run	${vFixStep} #() 
+############################	PUSH LIMIT
+unfix	fSetFoHiFix         ####解除限制
+unfix	fSetFoLoFix         ####解除限制
+unfix	fNveBd              ####解除限制
+unfix	fNvtHiWallexHiFix
+unfix	fNvtLoWallexLoFix
+unfix	fNveFlow 
+##################################
+fix	fSetFoHiFix gHiFix setforce 0.0 0.0 NULL    #上层施加压力
+fix	fSetFoLoFix gLoFix setforce 0.0 0.0 0.0     #固定底层
+fix	fAveFoHiFix gHiFix aveforce NULL NULL -${vForce} #上层施加压力
+fix	fNveBdLimit gBd nve/limit 0.00025            #奇怪 Why
+fix	fNvtHiWaMob gHiWaMob nvt temp ${vTemp} ${vTemp} 0.1 #Fe HiwaMob  NVT
+fix_modify	fNvtHiWaMob temp cT3dProHiWaMob
+fix	fNvtLoWaMob gLoWaMob nvt temp ${vTemp} ${vTemp} 0.1 #Fe LowaMob  NVT
+fix_modify	fNvtLoWaMob temp cT3dProLoWaMob
+fix	fNveAsp gAsp nve   # Fe Asp NVE
+fix	fNveFlow gFlow nve # 中间聚合物 NVE
+run	${vPushStepLimit} 
+################	PUSH	
+unfix	fSetFoHiFix
+unfix	fSetFoLoFix
+unfix	fAveFoHiFix
+unfix	fNveBdLimit
+unfix	fNvtHiWaMob
+unfix	fNvtLoWaMob
+unfix	fNveAsp
+unfix	fNveFlow 
+##################################
+fix	fSetFoHiFix gHiFix setforce 0.0 0.0 NULL #上层施加压力
+fix	fSetFoLoFix gLoFix setforce 0.0 0.0 0.0  #固定底层
+fix	fAveFoHiFix gHiFix aveforce NULL NULL -${vForce} #上层施加压力
+fix	fNveBd gBd nve #奇怪 Why
+fix	fNvtHiWaMob gHiWaMob nvt temp ${vTemp} ${vTemp} 0.1 fix_modify	fNvtHiWaMob temp cT3dProHiWaMob
+fix	fNvtLoWaMob gLoWaMob nvt temp ${vTemp} ${vTemp} 0.1 fix_modify	fNvtLoWaMob temp cT3dProLoWaMob
+fix	fNveAsp gAsp nve
+fix	fNveFlow gFlow nve
+run	${vPushStep} 
+################################ SHEAR	#############################
+unfix	fSetFoLoFix
+unfix	fAveFoHiFix
+unfix	fNveBd
+unfix	fNvtHiWaMob
+unfix	fNvtLoWaMob
+unfix	fNveAsp
+unfix	fNveFlow 
+##################################
+fix	fAveFoHiFix gHiFix aveforce NULL NULL -${vForce} #上层施加压力
+fix	fMoveHiFix gHiFix move linear  ${vShear} 0.0 NULL units box	#shear 
+fix	fMoveLoFix gLoFix move linear -${vShear} 0.0 0.0 units box	#shear
+fix	fTemNvtHiWaMob gHiWaMob nvt temp ${vTemp} ${vTemp} 0.1 fix_modify	fTemNvtHiWaMob temp cT3dProHiWaMob
+fix	fTemNvtLoWaMob gLoWaMob nvt temp ${vTemp} ${vTemp} 0.1 fix_modify	fTemNvtLoWaMob temp cT3dProLoWaMob
+fix	fNveAsp gAsp nve
+fix	fNveFlow gFlow nve
+run	${vShearStep} 
+##################################### endloopTemp	
+next	vTemp
+jump	in.multi_asp forlooptemp
+##################################### endloopShear 
+next	vShear
+jump	in.multi_asp forloopshear 
+#####################################	endloopForce	
+next	vForce
+jump	in.multi_asp forloopforce 

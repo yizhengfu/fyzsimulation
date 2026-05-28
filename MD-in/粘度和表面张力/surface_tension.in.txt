@@ -1,0 +1,83 @@
+# surface tension
+
+units		    lj
+atom_style	    bond
+bond_style 	    harmonic
+
+read_data	    mol.data
+special_bonds	fene
+
+mass		    1 1.0
+pair_style	    lj/cut 1.12246
+pair_coeff	    1  1  1.0 1.0
+bond_coeff	    1 1000.0 0.98
+pair_modify     shift yes
+
+neighbor	    0.3 bin
+neigh_modify	every 1  delay 0 check yes
+
+minimize        1.0e-4 1.0e-6 1000 100000
+
+velocity	    all  create 3.0 87287
+
+fix		        1 all  nve
+fix             2 all langevin 3.0 3.0 1000.0 699483
+fix             3 all deform 1 x final 0.0 10.0 y final 0.0 10.0 z final 0.0 10.0 units box
+
+thermo		    1000
+run		        50000
+unfix           3
+
+# 换成 FENE 势 
+
+bond_style      fene
+bond_coeff      1  30.0 1.5 1.0 1.0
+minimize        1.0e-4 1.0e-6 1000 100000
+run             1000
+
+# 复制体系
+
+replicate       20   20   20
+pair_style	    lj/cut  2.5
+pair_coeff	    1  1  1.0 1.0
+fix             3 all deform 1 x final 0.0 45.0 y final 0.0 45.0 z final 0.0 45.0 units box
+run             50000
+unfix           3
+
+# 删除上下部分polymer形成slab
+
+ 
+# slide region
+region          r1  block INF INF  INF INF  10 35 side out units box
+delete_atoms          region r1 mol yes compress yes
+reset_ids 
+
+change_box      all boundary p p f units box
+
+# 稳定压力在0，z方向不控压，盒子尺寸不变，跑足够长时间，达到压力和温度平衡
+fix             4 all press/berendsen x 0.0 0.0 1000.0 y 0.0 0.0 1000.0 couple xy 
+restart         equ.1  equ.2
+run             50000
+
+# 平衡后保证pressure~0后，转到nve系综模拟或nvt系综
+unfix           4
+run             1000
+#reset_timestep  0
+
+compute         Temp  all temp/com
+## sigma = xx, yy, zz, xy, xz, yz
+compute         sigma all stress/atom Temp
+
+
+# 计算surface tension
+# Z方向分层
+variable        binsize  equal 0.5 
+compute         st1 all chunk/atom bin/1d z center ${binsize} discard yes   
+variable        Vbin equal lx*ly*${binsize} 
+fix             st all ave/chunk 100 10 1000 st1 c_sigma[1] c_sigma[2] c_sigma[3] norm sample file vel.profile ave running
+
+
+# 编程求和
+#使用前，请先确认 ave/chunk是如何平均 Sxx, Syy,Szz的？
+#surface tension = 0.5*sum(0.5*(f_st[1]+f_st[2])-f_st[3])*${binsize}/${Vbin};
+

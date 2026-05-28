@@ -1,0 +1,150 @@
+# fyz-2022-6-11-1
+variable fname     index xlink #结构的文件名，不包含后缀，且后缀为“data”
+variable vTemp     equal 300 #温度
+variable vPre      equal 1   #单位为大气压，常压1atm=0.101Mpa
+variable vEqu1time equal 500 #500000fs
+variable vEqu2time equal 500 #500000fs
+variable vEqu3time equal 20  #20000fs
+variable vEqu4time equal 500 #500000fs
+variable vFrestep  equal 10  #1000 一般不修改 每隔1000步保存1次
+variable vAnnramp  equal 6   #6   #退火间隔
+variable vAnncyc   equal 5   #5   #退火循环次数
+variable vTemhi    equal 600 #600K
+variable vNrepeat  equal ${vEqu4time}/${vFrestep}  #一般不修改
+variable vDt equal (${vTemhi}-${vTemp})/${vAnnramp}
+##############----------------
+shell mkdir ${vTemp}K
+shell cd ${vTemp}K
+##############----------------Initial----------------
+log ${vTemp}K.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield 
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+read_data ../${fname}.data
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------MM----------------
+#min_style cg                                       #qwh
+#min_modify dmax 0.4
+minimize 1e-10 1e-10 20000 50000                    #能量最小化
+##############----------------Temper controllers
+compute cTall all temp
+compute cEng all pe/atom                            #compute potential energy for each atom
+compute cEatoms all reduce sum c_cEng               #compute total energy for whole system
+##############----------------Thermo
+timestep 1
+thermo_style custom step temp press pe ke etotal lx ly lz atoms vol c_cEatoms 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo 1000
+reset_timestep 0
+#####################################################
+# initial velocities
+velocity all create ${vTemhi} 5812775 dist gaussian loop geom
+#####################################################
+# Equilibration Stage 1 (NVT dynamics at 600K)
+##############----------------NVT
+fix 1 all nvt temp ${vTemhi} ${vTemhi} 100 drag 2
+fix_modify 1 temp cTall
+run ${vEqu1time}
+unfix 1
+write_data ${fname}${vTemp}K.Equ1.data
+write_restart ${fname}${vTemp}K.Equ1.restart
+#####################################################
+# Equilibration Stage 2 (NPT dynamics at 600K)
+##############----------------NPT
+fix 1 all npt temp ${vTemhi} ${vTemhi} 100 iso ${vPre} ${vPre} 1000 #drag 2
+fix_modify 1 temp cTall
+run ${vEqu2time}
+unfix 1
+write_data ${fname}${vTemp}K.Equ2.data
+write_restart ${fname}${vTemp}K.Equ2.restart
+#####################################################
+# Equilibration Stage 3 (NPT dynamics at 600K-100K)
+##############----------------NPT
+fix 1 all npt temp ${vTemp} ${vTemp} 100 iso ${vPre} ${vPre} 1000 #drag 2
+fix_modify 1 temp cTall
+run ${vEqu3time}
+unfix 1
+label loopc
+variable k loop  ${vAnncyc}
+label loopa
+variable i loop ${vAnnramp}
+variable vAnnTempin equal ${vTemp}+$i*${vDt}
+fix 1 all npt temp ${vAnnTempin} ${vAnnTempin} 100.0 iso ${vPre} ${vPre} 1000 #drag 2
+fix_modify 1 temp cTall
+run ${vEqu3time}
+unfix 1
+next i
+jump ../in-eqNVT.txt loopa
+label loopb
+variable j loop  ${vAnnramp}
+variable vAnnTempde equal ${vTemhi}-$j*${vDt}
+fix 1 all npt temp ${vAnnTempde} ${vAnnTempde}  100.0 iso ${vPre} ${vPre} 1000 #drag 2
+fix_modify 1 temp cTall
+run ${vEqu3time}
+unfix 1
+next j
+jump ../in-eqNVT.txt loopb
+next k
+jump SELF loopc
+write_data ${fname}${vTemp}K.Equ3.data
+write_restart ${fname}${vTemp}K.Equ3.restart
+#####################################################
+# Equilibration Stage 4 (NPT dynamics at 300K)
+reset_timestep 0
+##############----------------Dump----------------##############
+dump 1 all custom ${vFrestep} ${fname}${vTemp}K_NVT.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 sort id element C H S C N O H C O C C C C C   ##一定要注意修改元素名称与data文件一致
+##############----------------CED
+variable vNatoms equal count(all)                       ## set variable "natoms" to count number of atoms in system
+variable vTeng equal c_cEatoms                          ## set variable "teng" to store total energy of whole system
+variable vEcoh equal v_vTeng/v_vNatoms                  ## define cohesive energy as total energy divided by total atom number
+variable vDen  equal density
+variable vVol  equal vol
+variable vCED  equal v_vEcoh*6953/v_vVol
+variable vSP   equal (-v_vCED)^0.5
+fix CED all ave/time 10 10 1000 v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K_NVTCED.txt 
+fix CEDave all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K_NVTCEDave.txt
+##############----------------Energy
+variable etotal equal etotal  
+variable epair  equal epair
+variable evdwl  equal evdwl
+variable ecoul  equal ecoul
+variable ebond  equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable eimp   equal eimp
+variable emol   equal emol
+variable elong  equal elong 
+variable etail  equal etail
+variable enthalpy  equal enthalpy 
+fix energy all ave/time 10 10 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K_NVTEnergy.txt
+#fix energy all ave/time 1 1 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K_NVTEnergy.txt
+##############----------------MSD       
+compute cMSDall all msd com yes 
+variable vtwopointall equal c_cMSDall[4]/6/(step*dt+1.0e-6) 
+fix MSD all vector 1000 c_cMSDall[4]
+variable vfitslopeall equal slope(f_MSD)/6/(1000*dt)
+fix 52 all ave/time 1 1 1000 c_cMSDall[1] c_cMSDall[2]  c_cMSDall[3]  c_cMSDall[4] v_vtwopointall v_vfitslopeall file ${fname}${vTemp}K_NVTMSD.txt
+##############----------------RG
+compute RG all gyration                         #计算polymer的均方回转半径
+fix 61 all ave/time 10 10 1000 c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K_NVTRG.txt #每100个间隔取一个值，10个值求一次平均，每1000步输出一个值
+fix 62 all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K_NVTRGave.txt    #（XX,YY,ZZ,XY,YZ,XZ）
+##############----------------NVT
+fix 1 all nvt temp ${vTemp} ${vTemp} 100 drag 2
+fix_modify 1 temp cTall
+run ${vEqu4time}
+write_data ${fname}${vTemp}K.Equ4NVT.data
+write_restart ${fname}${vTemp}K.Equ4NVT.restart
+print "All done"

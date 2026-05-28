@@ -1,0 +1,120 @@
+#################################剪切  Velocity method 由于改变边界条件后p-s后会产生单个原子，所以剪切方向设定为Z方向，confine layer建模 ##########################
+variable fname index Polyethylene
+variable vFixpercent equal 0.20  #夹具的长度占总长的比值
+variable vShearPercent equal 0.1    #最终的应变率，控制模拟时间
+variable vTimestep equal 1
+variable vFrestep  equal 100
+#variable vTentime equal 90000
+##############----------------loop Temperature
+label loopTem
+variable vTemp index 300 #温度
+##############----------------loop Velocity
+label loopVel
+variable vVel index 2e-3   # 拉伸速度的单位A/fs
+##############----------------
+shell mkdir Shear_vel_${vTemp}_${vVel}
+shell cd Shear_vel_${vTemp}_${vVel}
+##############----------------Initial----------------
+log Shear_vel_${vTemp}_${vVel}.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+pair_style lj/class2/coul/cut 12.5 12.5
+#pair_style lj/class2/coul/long 12.5
+#kspace_style ewald 1.0e-4   
+read_data ../${fname}.data
+#read_restart ../${fname}.restart
+##############----------------Boundary
+#change_box all boundary p p s 
+change_box all boundary s p s remap units box 
+#comm_style tiled
+#fix fixbalance all balance 1000 1.2 rcb
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------Group
+variable vDxhi equal bound(all,xmax)
+variable vDxlo equal bound(all,xmin)
+variable vDxle equal lx
+variable vDfle equal ${vDxle}*${vFixpercent}
+variable vxmax equal ${vDxhi}-${vDfle}
+variable vxmin equal ${vDxlo}+${vDfle}
+variable vDMle equal ${vxmax}-${vxmin}
+region Low block INF ${vxmin} INF INF INF INF  units box
+region Top block ${vxmax} INF INF INF INF  INF units box
+group Low region Low 
+group Top region Top
+group Boundary union Low Top 
+group Mobile subtract all Boundary
+#####################################################
+# initial velocities
+timestep 1
+reset_timestep 0  #重设时间步为0
+velocity Mobile create ${vTemp} 4928459 dist gaussian units box
+compute cTMobile Mobile temp
+compute cTMobile1 Mobile temp/partial 1 1 0 #哪个方向剪切，哪个方向为0
+##############----------------应变计算	
+variable step equal step
+variable tmpx equal lx
+variable tmpy equal ly
+variable tmpz equal lz
+variable L0x equal ${tmpx}
+variable L0y equal ${tmpy}
+variable L0z equal ${tmpz}
+variable vol_ini equal v_L0x*v_L0y*v_L0z
+print "Initial volumn, vol = ${vol_ini}"
+# In units metal, pressure is in [bars]; sxx, syy, szz are in GPa
+compute stress Mobile stress/atom NULL
+compute strsxz Mobile reduce sum c_stress[5]
+variable sxz1 equal (c_strsxz/v_vol_ini)*1.01325/10000
+variable deltaL  equal  (lz-${L0z})
+variable sxy equal "-pxz*1.01325/10000000000" # calculate shear stress #metal 单位为bar转换为GPa需要除10000，real单位为atm，转换为Gpa需要乘以0.000101325
+variable strain equal v_deltaL/${tmpz}        # calculate shear strain
+fix Stressstrain all print 1000 "${step} ${deltaL} ${strain} ${sxz1} ${sxy}" file Shear_data.txt screen no
+##############----------------步数计算	
+variable vShearstep equal floor(((1+${vShearPercent})*${L0z})/(2*${vVel})*1000)*1000
+variable Nrepeat equal ${vShearstep}/${vFrestep}
+##############----------------Thermo
+thermo_style custom step press temp pe ke etotal epair ebond eangle edihed lx ly lz vol 
+thermo_modify temp cTMobile1 lost ignore lost/bond ignore
+thermo 100
+##############----------------Dump
+#dump 1 all atom ${vFrestep} Tension_${vTemp}_${vVel}.xyz
+dump 1 all custom ${vFrestep} Shear_${vTemp}_${vVel}.lammpstrj id mass type x y z vx vy vz xs ys zs element &
+   c_stress[1] c_stress[2] c_stress[3] c_stress[4] c_stress[5] c_stress[6]    
+dump_modify 1 element H C  
+
+##############----------------拉伸时系综设置
+##############----------------设置中间变形区域速度梯度	
+velocity Top set   0.0 0.0 ${vVel}
+velocity Low set   0.0 0.0 -${vVel}
+velocity Mobile ramp vz -${vVel} ${vVel} x ${vxmin} ${vxmax} sum yes units box
+fix fLow Low setforce 0.0 0.0 0.0
+fix fTop Top setforce 0.0 0.0 0.0
+#fix 2 all nvt temp ${vTemp} ${vTemp} 100 
+#fix 1 all nve/limit 0.1
+fix 1 all nve
+fix 2 Mobile temp/rescale 10 ${vTemp} ${vTemp} 100.0 1.0
+#fix 2 all temp/berendsen ${vTemp} ${vTemp} 100.0
+fix_modify 2 temp cTMobile1
+##############----------------启动运算
+run	${vShearstep}
+write_data ${fname}.Shear_${vTemp}_${vVel}.data
+write_restart ${fname}.Shear_${vTemp}_${vVel}.restart
+#unfix 1
+unfix 2
+undump 1 
+#####################################################
+shell cd ../
+next vVel
+jump in.Shearvelocity.txt loopVel
+next vTemp
+jump in.Shearvelocity. loopTem
+print "All done"

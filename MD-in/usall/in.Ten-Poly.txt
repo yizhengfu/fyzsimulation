@@ -1,0 +1,94 @@
+# VARIABLES
+variable fname index xlink_final.data
+variable vFixpercent equal 0.02 #夹具的长度占总长的壁纸
+variable vTenPercent equal 1    #最终的应变率，控制模拟时间
+variable vTimestep equal 1
+variable vFrestep  equal 1000
+##############----------------loop Temperature
+label loopTem
+variable vTemp index 300 #温度
+##############----------------loop Velocity
+label loopVel
+variable vVel index 1e-4 # 速度的单位A/fs
+##############----------------
+shell mkdir ${vTemp}_${vVel}
+shell cd ${vTemp}_${vVel}
+##############----------------Initial----------------
+log ${vTemp}_${vVel}.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set# PCFF potential information
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+#read_data ../${fname}
+read_restart ../${fname}
+##############----------------Boundary
+change_box all boundary p p s 
+#comm_style tiled
+#fix fixbalance all balance 1000 1.2 rcb
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------Group
+variable vDzhi equal bound(all,zmax)
+variable vDzlo equal bound(all,zmin)
+variable vDzle equal ${vDzhi}-${vDzlo}
+variable vDfle equal ${vDzle}*${vFixpercent}
+variable vzmax equal ${vDzhi}-${vDfle}
+variable vzmin equal ${vDzlo}+${vDfle}
+variable vDMle equal ${vzmax}-${vzmin}
+region Low block INF INF INF INF INF ${vzmin} units box
+region Top block INF INF INF INF ${vzmax} INF units box
+group Low region Low 
+group Top region Top
+group Boundary union Low Top 
+group Mobile subtract all Boundary
+#固定边界层	
+velocity Low set 0.0 0.0 0.0 units box
+velocity Top set 0.0 0.0 0.0 units box
+fix fLow Low setforce 0.0 0.0 0.0
+fix fTop Top setforce 0.0 0.0 0.0
+#应力计算	
+compute	1 Mobile stress/atom NULL
+#compute 2 Mobile reduce sum c_1[1] c_1[2] #原来
+compute 2 Mobile reduce sum c_1[1] c_1[2] c_1[3] 
+variable vMvol equal lx*ly*(lz-2*${vDfle})
+variable vStress equal c_2[1]/(v_vMvol*10)  #MPa
+#应变计算	
+variable lzn equal lz-2*${vDfle}
+variable lz0 equal ${lzn}
+variable vStrain equal (v_lzn-v_lz0)/v_lz0
+variable vTentime equal (1+${vTenPercent})*v_lz0/${vVel}
+#拉伸结果输出
+thermo_style custom step press temp lx ly lz vol 
+thermo 1000
+variable istep equal step
+fix tension all ave/time 1 1 1000 v_istep v_vStrain v_vStress file Tension.txt
+dump 1 all atom 1000 Tension.xyz
+dump 2 all custom 1000 All.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 2 element C H O
+#拉伸时系综设置
+fix	2 all nvt temp ${vTemp} ${vTemp} 0.01
+#设置两端边界层双向移动
+velocity Top set 0.0 0.0 ${vVel}
+velocity Low set 0.0 0.0 -${vVel}
+#设置中间变形区域速度梯度
+velocity Mobile ramp vz -${vVel} ${vVel} z ${vzmin} ${vzmax} sum yes units box
+#启动运算
+run	${vTentime}
+write_data ${fname}.Ten
+write_restart restart.${fname}.Ten
+shell cd ../
+next vVel
+jump in-eq.txt loopVel
+next vTemp
+jump in-eq.txt loopTem
+print "All done"

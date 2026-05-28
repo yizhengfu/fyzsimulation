@@ -1,0 +1,121 @@
+# # fyz-2022-6-11-1. 6-13-1.6-15-1
+variable fname     index xlink_final.data #第四阶段NVT后的restart文件,如果前期是在300K下做的NVT模拟，则这个值不用修改
+variable vTemp     equal 300 #温度
+variable vEqu4time equal 500 #500000
+variable vFrestep  equal 10 #一般不修改 每隔1000步保存1次
+variable vNrepeat  equal ${vEqu4time}/${vFrestep}  #一般不修改
+##############----------------
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+read_restart ${fname}300K.Equ4NVT.restart
+##############----------------loop Pressure
+label loopPre
+variable vPre index 0.101 1 2 3 4.5 6 #单位MPa 常压1atm=0.101Mpa
+variable vPress equal ${vPre}*9.87   #压力 1MPa=9.87atm 
+##############----------------
+shell mkdir ${vTemp}K_${vPre}MPa
+shell cd ${vTemp}K_${vPre}MPa
+log ${vTemp}K_${vPre}.log
+##############----------------Initial----------------
+##############----------------Neighbour
+neighbor 2.0 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------Temper controllers
+compute cTall all temp
+compute cPress all pressure thermo_temp
+compute cEng all pe/atom                                 ## compute potential energy for each atom
+compute cEatoms all reduce sum c_cEng                     ## compute total energy for whole system
+##############----------------Thermo
+timestep 1
+thermo_style custom step temp press pe ke etotal lx ly lz atoms vol c_cEatoms 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo 1000
+reset_timestep 0
+#####################################################
+# Equilibration Stage 4 (NPT dynamics at 300K)
+##############----------------Dump----------------##############
+dump 1 all custom ${vFrestep} All_${fname}${vTemp}K${vPre}MPa_NPT.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 sort id element C N O C H H C O C C C C C S
+variable vDumpfrestep equal 10*${vFrestep}
+dump 2 all cfg ${vDumpfrestep} dump.NPT.*.cfg mass type xs ys zs      #输出cfg格式得文件，方便后续导入到MS可视化结果
+dump_modify 2 sort id element C N O C H H C O C C C C C S
+##############----------------CED
+variable vNatoms equal count(all)                     ## set variable "natoms" to count number of atoms in system
+variable vTeng equal c_cEatoms                          ## set variable "teng" to store total energy of whole system
+variable vEcoh equal v_vTeng/v_vNatoms                   ## define cohesive energy as total energy divided by total atom number
+variable vDen equal density
+variable vVol  equal vol
+variable vCED  equal v_vEcoh*6953/v_vVol
+variable vSP   equal (-v_vCED)^0.5
+fix 11 all ave/time 10 10 1000 v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K${vPre}MPa_NPTCED.txt 
+fix 12 all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K${vPre}MPa_NPTCEDave.txt
+##############----------------Energy
+variable etotal equal etotal  
+variable epair  equal epair
+variable evdwl  equal evdwl
+variable ecoul  equal ecoul
+variable ebond  equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable eimp   equal eimp
+variable emol   equal emol
+variable elong  equal elong 
+variable etail  equal etail
+variable enthalpy  equal enthalpy  
+#fix energy all ave/time 10 10 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K${vPre}MPa_NPTEnergy.txt
+fix energy all ave/time 1 1 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K${vPre}MPa_NPTEnergy.txt
+##############----------------MSD       
+compute cMSDall all msd com yes 
+variable vtwopointall equal c_cMSDall[4]/6/(step*dt+1.0e-6) 
+fix 51 all vector 1000 c_cMSDall[4]
+variable vfitslopeall equal slope(f_51)/6/(1000*dt)
+fix 52 all ave/time 1 1 1000 c_cMSDall[1] c_cMSDall[2]  c_cMSDall[3]  c_cMSDall[4] v_vtwopointall v_vfitslopeall file ${fname}${vTemp}K${vPre}MPa_NPTMSD.txt
+##############----------------RG
+compute RG all gyration                         #计算polymer的均方回转半径
+fix 61 all ave/time 10 10 1000 c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K${vPre}MPa_NPTRG.txt #每100个间隔取一个值，10个值求一次平均，每1000步输出一个值
+fix 62 all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K${vPre}MPa_NPTRGave.txt    #（XX,YY,ZZ,XY,YZ,XZ）
+##############----------------NPT
+##velocity all create ${vTemp} 5812775 dist gaussian loop geom
+fix 2 all npt temp ${vTemp} ${vTemp} 100 iso ${vPress} ${vPress} 1000 #drag 2
+#fix 1 all nve
+#fix 2 all nvt temp ${vTemp} ${vTemp} 100 drag 2
+#fix 2 all temp/berendsen ${vTemp} ${vTemp} 100.0
+#fix 3 all press/berendsen iso ${vPress} ${vPress} 1000
+fix_modify 2 temp cTall press cPress
+run  ${vEqu4time}
+write_data ${fname}${vTemp}K${vPre}MPa_Equ4NPT.data
+write_restart ${fname}${vTemp}K${vPre}MPa_Equ4NPT.restart
+#unfix 1
+unfix 2
+#unfix 3
+undump 1
+undump 2
+unfix 11  
+unfix 12 
+unfix 51 
+unfix 52 
+unfix 61 
+unfix 62 
+unfix energy
+uncompute cMSDall
+uncompute RG
+uncompute cTall
+uncompute cPress
+uncompute cEng
+uncompute cEatoms
+#####################################################
+shell cd ../
+next vPre
+jump in-eqNPT.txt loopPre 
+print "All done"

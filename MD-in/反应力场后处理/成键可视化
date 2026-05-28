@@ -1,0 +1,121 @@
+import os
+#work_path = "/Users/baoluyao/work/wenku/cho/"
+work_path = "D:/Desktop/c17_3500T_0.05GPa/"
+bonds = open(work_path + "300bonds.reax","r")
+dump = open(work_path + "c17_3500T_NVT_bonds_ana.lammpstrj","r")
+n_atomtype = 1
+N_Frame = 98
+n_atom = 100
+
+#######################
+if N_Frame > 100:
+    print("Too many frames, please reduce using ovito to less than 100 frames")
+    os.sys.exit()
+n_bond0 = 0
+n_bond_new = 0
+atom_sec = []
+bond_sec0 = []
+bond_sec_new = []
+bond_sec_write = []
+n_bond_write = 0
+flag_final = 1
+for i in range(N_Frame):
+    for j in range(5):
+        line_dump = dump.readline()
+
+    line_dump = dump.readline()
+    xlo = line_dump.split()[0]
+    xhi = line_dump.split()[1]
+    line_dump = dump.readline()
+    ylo = line_dump.split()[0]
+    yhi = line_dump.split()[1]
+    line_dump = dump.readline()
+    zlo = line_dump.split()[0]
+    zhi = line_dump.split()[1]
+    line_dump = dump.readline()
+    for k in range(n_atom):
+        line_dump = dump.readline()
+        atom_sec.append(line_dump)
+    if i == 0:
+        pre_line = 7
+    else:
+        pre_line = 8
+    for j in range(pre_line):
+        line_bond = bonds.readline()
+    for k in range(n_atom):
+        line_bond = bonds.readline()
+        nb = int(line_bond.split()[2])
+        if nb > 0:
+            for l in range(nb):
+                if i == 0:
+                    n_bond0 += 1
+                n_bond_new += 1
+                tmp = str(n_bond_new) + " " + "1" + " " + line_bond.split()[0] + " " + line_bond.split()[3+l] + "\n"
+                if i == 0:
+                    bond_sec0.append(tmp)
+                bond_sec_new.append(tmp)
+    for m in range(n_bond_new):
+        a1 = int(bond_sec_new[m].split()[2])
+        a2 = int(bond_sec_new[m].split()[3])
+        for n in range(n_bond0):    
+            a3 = int(bond_sec0[n].split()[2])
+            a4 = int(bond_sec0[n].split()[3])
+            if a1==a3:
+                flag13 = 1
+            else:
+                flag13 = 0
+            if a1==a4:
+                flag14 = 1
+            else:
+                flag14 = 0
+            if a2==a3:
+                flag23 = 1
+            else:
+                flag23 = 0
+            if a2==a4:
+                flag24 = 1
+            else:
+                flag24 = 0
+            flag = flag13 + flag14 + flag23 + flag24
+            if flag == 2:
+                flag_final = 0
+                break
+        if flag_final == 1:
+            n_bond_write += 1
+            tmp_write = str(n_bond_write) + " 1 " + bond_sec_new[m].split()[2] + " " + bond_sec_new[m].split()[3] + "\n"
+            bond_sec_write.append(tmp_write)
+        else:
+            flag_final = 1
+            
+    data = open(work_path + "data" + str(i),"w")
+    data.write("LAMMPS data from bonds\n")
+    data.write("\n")
+    data.write(str(n_atom) + " " + "atoms\n")
+    data.write(str(n_atomtype) + " atom types\n")
+    if n_bond_write > 0:
+        data.write(str(n_bond_write) + " " + "bonds\n")
+        data.write("1 bond types\n")
+    data.write("\n")
+    data.write(str(xlo) + " " + str(xhi) + " " + "xlo xhi\n")
+    data.write(str(ylo) + " " + str(yhi) + " " + "ylo yhi\n")
+    data.write(str(zlo) + " " + str(zhi) + " " + "zlo zhi\n")
+    data.write("\n")
+    data.write("Atoms\n")
+    data.write("\n")
+    data.writelines(atom_sec)
+    if n_bond_write > 0:
+        data.write("\n")
+        data.write("Bonds\n")
+        data.write("\n")
+        data.writelines(bond_sec_write)
+    data.close()
+    print(n_bond_new)
+    n_bond_new = 0
+    atom_sec = []
+    bond_sec_new = []
+    bond_sec_write = []
+    n_bond_write = 0
+
+
+
+

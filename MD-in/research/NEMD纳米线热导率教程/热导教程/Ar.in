@@ -1,0 +1,306 @@
+#------------------------------------------------#
+#      Author_Email: lammps_materials@163.com    #  
+#------------------------------------------------#
+###################
+# initial setting #
+###################
+#---------------------------------------------------------------------------#
+#---------------------------------------------------------------------------#
+# loop make all_file
+echo   screen
+print        " ------------------------------------------------"
+print        " -----------------NOW making files---------------"
+print        " ------------------------------------------------"
+label  out_makefile
+    variable     number_out loop 1               
+    variable     file_name_out index  60 
+    shell        mkdir ${file_name_out}  
+    shell        cp Ar.in  ${file_name_out}
+    shell        cd ${file_name_out}
+    # loop make in_file
+        label        in_makefile
+        
+        variable     number_in loop 4               
+        variable     file_name_in index 10 15 20 25    
+        shell        mkdir ${file_name_in}   
+       
+        shell        cp Ar.in  ${file_name_out}                                        
+        
+        next         number_in    
+        next         file_name_in       
+        jump         Ar.in  in_makefile 
+    clear
+    # loop make in_file
+    shell        cd ..
+    next         number_out
+    next         file_name_out
+    
+jump         Ar.in  out_makefile 
+clear
+print        " ------------------------------------------"
+print        " ------------------Finish!-----------------"
+print        " ------------------------------------------"
+# loop make all_file
+#---------------------------------------------------------------------------#
+#---------------------------------------------------------------------------#
+
+label        calculation_in_outfile
+variable     loop_number_out loop 1 
+# water fraction
+variable     loop_file_out_name index 60  
+shell        cd ${loop_file_out_name}
+log          ${loop_file_out_name}.log
+#---------------------------------------------------------------------------#
+label        calculation_in_infile
+variable     loop_number_in loop 4
+variable     loop_file_in_name index  10 15 20 25 
+
+shell        cd ${loop_file_in_name}
+log          ${loop_file_in_name}.log
+#---------------------------------------------------------------------------#
+print        " --------------------------------------------------------------------"
+print        " ----------Now the temperature is ${loop_file_out_name}-----------"
+print        " ------Now lattice replicate number  is ${loop_file_in_name}------"
+print        " --------------------------------------------------------------------"
+#---------------------------------------------------------------------------#
+
+echo              screen
+units             metal
+dimension           3
+boundary          p p p
+atom_style        full
+#----------------------------------------------------------#
+variable          TS        equal 0.01                    ### ${TS} timestep
+variable          Tdamp     equal 100*${TS}               ### ${Tdamp} Tdamp
+variable          Pdamp     equal 1000*${TS}              ### ${Tdamp} Tdamp
+variable          T         equal ${loop_file_out_name}   ### ${T} initial temperature
+variable        POWER       equal 0.08 
+timestep         ${TS}
+#----------------------------------------------------------#
+#  unit cell
+#----------------------------------------------------------#
+
+variable          x_length  equal   ${loop_file_in_name}
+
+variable          half_x    equal   ${x_length}*0.5
+
+variable          lattice_unit      equal 5.4*2
+
+variable          x_length    equal ${lattice_unit}*${x_length}
+variable          y_length    equal ${lattice_unit}*5
+variable          z_length    equal ${lattice_unit}*5
+
+region            box block 0 ${x_length} &
+                            0 ${y_length} &
+                            0 ${z_length} units box 
+create_box        1 box 
+lattice           fcc 5.4
+create_atoms       1 box 
+#----------------------------------------------------------#
+variable          materials_length   equal (${half_x}-1)*${lattice_unit}
+
+print             "=========================================="
+print             "=========================================="
+print             "The material length is ${materials_length}"
+print             "=========================================="
+print             "=========================================="
+#----------------------------------------------------------#
+###################
+#  group setting  #
+###################
+#----------------------------------------------------------#
+# setting mass
+mass              1 40  # mass for Ar
+
+group             Ar    type 1
+
+velocity          all create ${T} 12345 loop local         #
+#----------------------------------------------------------#
+minimize          1.0e-5 1.0e-7 1000 10000
+minimize          1.0e-5 1.0e-7 1000 10000
+minimize          1.0e-5 1.0e-7 1000 10000
+
+write_data        system.data
+#----------------------------------------------------------#
+#                     pair interaction                     #
+#----------------------------------------------------------#
+
+pair_style        lj/cut   10
+pair_coeff        * *      1.032e-2 3.405 
+
+neighbor          0.5 bin
+neigh_modify      every 5 delay 0 check no
+#----------------------------------------------------------#
+
+thermo            1000
+#----------------------------------------------------------#
+###################
+#    run 1        #
+###################
+
+# loop relax system 500 ps
+#----------------------------------------------------------------------#
+variable         50_ps equal 50/${TS}
+variable         500_ps equal 500/${TS}
+
+variable         loop_all_num  equal 10
+variable         relax_system  loop ${loop_all_num}
+label            loop
+
+fix              NVT   all   nvt temp ${T} ${T} ${Tdamp} 
+
+run              ${50_ps}
+
+unfix            NVT
+minimize         1.0e-5 1.0e-7 1000 10000
+minimize         1.0e-5 1.0e-7 1000 10000
+
+next             relax_system
+jump             SELF loop
+
+fix              NVT   all   nvt temp ${T} ${T} ${Tdamp} 
+
+run              ${500_ps}
+
+unfix            NVT
+#------------------------------------------------------------------------#
+#------------------------------------------------------------------------#
+#                       heat region define 
+#------------------------------------------------------------------------#
+#
+#   1    2  3  4  5  6  7  8  9  10    11   12 13 14 15 16 17 18 19 20 
+#   ##   ## ## ## ## ## ## ## ## ##    ##   ## ## ## ## ## ## ## ## ##
+#   ##   ## ## ## ## ## ## ## ## ##    ##   ## ## ## ## ## ## ## ## ##
+#    ^   <------------------------>      ^  <------------------------>
+#    |             9 units               |         9 units   
+#   hot                                cold
+#------------------------------------------------------------------------#
+#                   Real length = 9*units 
+#------------------------------------------------------------------------#
+
+variable          1_lattice_unit     equal  1*${lattice_unit}
+variable          10_lattice_unit    equal ${half_x}*${lattice_unit}
+variable          11_lattice_unit    equal (${half_x}+1)*${lattice_unit}
+
+# heat region
+region            heat  block  0                  ${1_lattice_unit}  INF INF INF INF units box 
+
+# cold region
+region            cold  block  ${10_lattice_unit} ${11_lattice_unit}  INF INF INF INF units box 
+variable          all_lattice_unit    equal  ${x_length}*${lattice_unit}
+
+group             heat dynamic all region heat every 1
+
+group             cold dynamic all region cold every 1
+
+variable          heat_flux_length     equal ${10_lattice_unit}-${1_lattice_unit} 
+#----------------------------------------------------------#
+#----------------------------------------------------------#
+region            left_heat_flux   block  ${1_lattice_unit}  ${10_lattice_unit}  INF INF INF INF  units box 
+region            right_heat_flux  block  ${11_lattice_unit} ${all_lattice_unit} INF INF INF INF  units box 
+
+group             left_heat_flux  dynamic all region left_heat_flux  every 1
+
+group             right_heat_flux dynamic all region right_heat_flux every 1
+#----------------------------------------------------------#
+variable          HOT_temp   equal ${T}+20
+variable          COLD_temp  equal ${T}-20
+
+compute          heat heat temp/region heat
+compute          cold cold temp/region cold
+#----------------------------------------------------------#
+#                     heat process_1
+#----------------------------------------------------------#
+fix               NVE   all nve
+fix               HEAT  all ehex 1  ${POWER} region heat 
+fix               COLD  all ehex 1 -${POWER} region cold 
+#----------------------------------------------------------#
+
+###################
+#    run 2        #
+###################
+thermo_style      custom step temp pe etotal press 
+variable          500_ps equal  500/${TS}
+
+run               ${500_ps}
+
+#run               10
+
+#----------------------------------------------------------#
+#                     heat process_2
+#----------------------------------------------------------#
+reset_timestep 0
+#----------------------------------------------------------#
+#                      all temp
+#----------------------------------------------------------#
+variable         KB equal 8.625e-5
+
+compute          KE all ke/atom
+variable         all_temp atom c_KE/${KB}/1.5
+#----------------------------------------------------------#
+
+fix               NVE   all nve
+fix               HEAT  all ehex 1  ${POWER} region heat 
+fix               COLD  all ehex 1 -${POWER} region cold 
+
+thermo_style      custom step temp pe etotal press  c_heat c_cold
+
+#----------------------------------------------------------#
+
+compute          PE all  pe/atom 
+compute          V all  stress/atom NULL virial
+
+#----------------------------------------------------------#
+compute           J1   left_heat_flux   heat/flux KE PE V
+
+compute           J2   right_heat_flux  heat/flux KE PE V
+
+variable         JJ_1    equal  c_J1[1]/${heat_flux_length}
+
+variable         JJ_2    equal  c_J2[1]/${heat_flux_length}
+#----------------------------------------------------------#
+
+variable          block_num equal 20
+variable          reduced equal 1/${block_num}
+
+compute          layers all chunk/atom bin/1d x lower ${reduced} units reduced
+
+# output_1 heat flux 
+fix              heat_flux_layer all ave/time 1 1 1 &
+                 v_JJ_1  v_JJ_2  file heat_flux.txt
+
+# output_2 temperature 
+fix              temp1 all ave/chunk 10 10 1000 layers                     &
+                 v_all_temp file all.temp
+
+# output_3 temperature for hot/cold 
+fix              ave all ave/time 1000 1 1000 c_heat c_cold file temp.txt
+
+#----------------------------------------------------------#
+
+###################
+#    run 3        #
+################### 
+
+thermo           1000
+variable         1ns equal 1000/${TS}
+
+run              ${1ns}
+#run              10
+
+
+#--------------------------------------------------------------#
+shell        cd ..
+clear
+next         loop_file_in_name 
+jump         Ar.in calculation_in_infile
+#---------------------------------------------------------------------------#
+shell        cd ..
+clear
+
+next         loop_file_out_name
+jump         Ar.in calculation_in_outfile
+#---------------------------------------------------------------------------#
+
+
+

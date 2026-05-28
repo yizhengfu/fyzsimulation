@@ -1,0 +1,35 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE REGISTRY SYSTEM "System/Registry.dtd">
+<REGISTRY>
+	<ITEMS>
+		<ITEM NAME="cmdUser55" TEXT="Crosslink" TOOLTIP="Run user script" STATUS="Atomistic xlinking between oligomer R1 and xlinker R2 atoms. " CATEGORY="RunScriptOnScopeOnServer" IMAGE="ScriptingPlugin,1" CATEGORYDATA="library://My%20Favorites/xLink.pl" ENABLEMENTPROCESSOR="UserMenu:3dAtomisticDocument" DOCUMENTUSAGE="ActiveDocument" HELP="None" TYPE="Command" IMPORTANCE="Medium" ACCELERATOR="" LOCKACCESS="No">
+			<OPTIONS>
+				<OPTION NAME="Forcefield" DATATYPE="String" DEFAULTVALUE="COMPASSII"/>
+				<OPTION NAME="Conversion" DATATYPE="Integer" DEFAULTVALUE="100"/>
+				<OPTION NAME="MinRxnRadius" DATATYPE="Float" DEFAULTVALUE="3.5"/>
+				<OPTION NAME="MaxRxnRadius" DATATYPE="Float" DEFAULTVALUE="10"/>
+				<OPTION NAME="StepRxnRadius" DATATYPE="Float" DEFAULTVALUE="0.5"/>
+				<OPTION NAME="Iterations_per_Radius" DATATYPE="Integer" DEFAULTVALUE="3"/>
+				<OPTION NAME="ChargeMethod" DATATYPE="String" DEFAULTVALUE="Group based"/>
+				<OPTION NAME="Temperature" DATATYPE="Float" DEFAULTVALUE="600"/>
+				<OPTION NAME="TemperatureCycle" DATATYPE="Boolean" DEFAULTVALUE="No"/>
+				<OPTION NAME="Initial_Equil_ps" DATATYPE="Float" DEFAULTVALUE="5"/>
+				<OPTION NAME="Equil_ps" DATATYPE="Integer" DEFAULTVALUE="25"/>
+				<OPTION NAME="OpenRings" DATATYPE="Boolean" DEFAULTVALUE="Yes"/>
+				<OPTION NAME="Condensation" DATATYPE="Boolean" DEFAULTVALUE="No"/>
+				<OPTION NAME="React_Multi_Oligomer" DATATYPE="Boolean" DEFAULTVALUE="No"/>
+				<OPTION NAME="React_Multi_Xlinker" DATATYPE="Boolean" DEFAULTVALUE="No"/>
+			</OPTIONS>
+		</ITEM>
+	</ITEMS>
+	<MENUS>
+		<MENU NAME="menuContainer" OWNER="Container">
+			<POPUP NAME="User" LOCATION="Default" POSITIONAL="No">
+				<POPUP NAME="Simulate" LOCATION="Default" POSITIONAL="No">
+					<MENUITEM NAME="cmdUser55" LOCATION="Default" POSITIONAL="No"/>
+				</POPUP>
+			</POPUP>
+		</MENU>
+	</MENUS>
+	<TOOLBARS/>
+</REGISTRY>

@@ -1,0 +1,23 @@
+# VARIABLES 采用rerun 进行rdf分析
+variable fname     index xlink.data #文本
+##############----------------Initial----------------
+log rerun.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield set
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+kspace_style ewald 1.0e-4   
+read_data ${fname}
+rerun All_300_1_300NPT.lammpstrj dump id mass type x y z xs ys zs element#需要修改
+dump d42 all cfg 10000 dump.NVT.*.cfg mass type xs ys zs      #输出cfg格式得文件，方便后续导入到MS可视化结果
+dump_modify d42 sort id element C N O C H H C O C C C C C S  
+run  0
+print "All done"

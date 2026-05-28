@@ -1,0 +1,66 @@
+#初始模拟系统设置
+units         metal
+boundary      p p p
+atom_style    atomic
+neighbor	  2 bin
+timestep      0.001
+#读取data文件
+read_restart	restart.equil
+#增加z方向尺寸
+change_box all z delta 0 100 units box
+#金刚石球建模
+lattice       diamond  3.52
+region        ball   sphere  35 17 80 15  units box #x y z r 
+create_atoms  6 region ball
+#设置区域和原子组
+region        boundary block INF INF INF INF INF 8 units box
+region		  piece  block INF INF INF INF 8 50 units box
+group         boundary region boundary
+group         piece region piece
+group		  ball region ball
+#定义计算相关信息,固定原子
+compute    1 piece temp
+velocity   boundary set 0 0 0
+fix        b boundary setforce 0 0 0 
+#定义原子间相互作用势
+pair_style     hybrid lj/cut 10 eam/alloy tersoff
+pair_coeff     * * eam/alloy FeNiCrCoAl-heaweight.setfl Fe Ni Cr Co Al NULL
+pair_coeff     * * tersoff SiC.tersoff NULL NULL NULL NULL NULL C
+pair_coeff     1 6 lj/cut 0.038687 2.8605
+pair_coeff     2 6 lj/cut 0.038429 2.841
+pair_coeff     3 6 lj/cut 0.037758 2.868
+pair_coeff     4 6 lj/cut 0.038281 2.842
+pair_coeff     5 6 lj/cut 0.003457 3.1325
+#热力输出
+thermo			100
+thermo_style	custom step temp ke pe 
+#压头快速移动到工件表面
+displace_atoms  ball move 0 0 -15 units box
+#压头下压
+dump			1 all custom 100 movedown.xyz id type x y z
+velocity		ball set 0 0 -1 units box
+fix				10 ball nve/noforce
+fix				20 piece nvt temp 300 300 0.1
+run				9000
+undump			1
+unfix			10
+unfix			20
+reset_timestep	0
+#摩擦力计算
+compute			fx0 ball reduce sum fx
+compute			fy0 ball reduce sum fy
+compute			fz0 ball reduce sum fz
+variable 		fxx equal c_fx0
+variable 		fyy equal -c_fy0
+variable 		fzz equal c_fz0
+variable        distance equal step/1000
+fix def3 all print 100 "${distance} ${fxx} ${fyy} ${fzz}" file friction.txt screen no
+#计算球的重心
+variable    ball_x equal xcm(ball,x)
+variable    ball_y equal xcm(ball,y)
+variable    ball_z equal xcm(ball,z)
+#摩擦过程
+dump			1 all custom 1000 frc.xyz id type x y z
+fix             002 ball move transrot 0 1 0 ${ball_x} ${ball_y} ${ball_z} 0 0 1 5 units box
+fix				20 piece nvt temp 300 300 0.1
+run				70000

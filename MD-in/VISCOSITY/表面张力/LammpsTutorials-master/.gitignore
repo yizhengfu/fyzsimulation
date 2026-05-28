@@ -1,0 +1,11 @@
+log.*
+traj.*
+traj_*
+*.dcd
+*.xyz
+*.bin
+*.new.*
+confout.*
+*.png
+*.dat
+out.*

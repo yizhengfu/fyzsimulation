@@ -1,0 +1,77 @@
+#This is an input script to realize nanoindentation of pure Cu, created by Li Wang
+
+########################################################################
+###   in文件拆分成三个部分，分别是：                                   ###
+###   1. 模型设置文件     initial.in                                 ###
+###   2. 势函数设置文件   potential.in                               ###
+###   3. 运行文件        run.in                                     ###
+###   可根据需要修改基体材料大小以及势函数，在模型设置文件中修改即可    ###
+#####################################################################
+#--------------------------------设置输出文件-----------------------
+clear
+shell           mkdir output output/relax output/indentation
+#read_restart     relax.restart
+include         initial.in
+include         potential.in
+
+
+variable        tstp equal 0.001
+variable        T equal 293
+variable        thermo_step equal 1000
+variable        relax_step  equal 500000
+#---------------------------------弛豫-----------------------------
+neighbor	    3.0 bin
+neigh_modify	delay 5
+compute	        newTemp thermostat_layer temp
+fix		        1 all nve
+fix		        2 boundary_layer_down setforce 0.0 0.0 0.0
+
+velocity	    newtonian_layer set NULL NULL NULL 
+velocity	    thermostat_layer create $T 5812775 temp newTemp 
+fix		        3 thermostat_layer temp/rescale 10 $T $T 10 1
+fix_modify	    3 temp newTemp
+
+timestep	    ${tstp}
+thermo		    ${thermo_step}
+thermo_modify	temp newTemp
+thermo_style	custom step c_newTemp press pe ke etotal
+run		        ${relax_step}
+
+write_data      ./output/relax/relax.data
+write_restart   ./output/relax/relax.restart
+#####################################################################
+reset_timestep  0
+#-----------------------------压痕实现-----------------------
+variable        depth equal 30    #压入深度为30埃
+variable        distance equal 10 #压头与表面的初始距离为10埃
+variable        loadv equal 0.1  #加载速度为0.1埃/ps
+variable        load_step equal (v_depth+v_distance)/v_loadv/(${tstp})
+variable        hold_step equal 20000 
+###计算压入深度
+variable	    dis equal xcm(tool,z)
+variable        initial_dis equal ${dis}    
+variable        disp equal -(v_dis-(${initial_dis}))
+###计算压入载荷
+#方法一
+variable	    m1 equal fcm(tool,z)           #用压头质心的受力计算载荷
+variable        unit equal 1.602*1.0e-3        #单位换算成μN
+variable        load1 equal v_m1*(${unit})
+#方法二
+compute 	    forcez tool property/atom fz     
+compute		    m2 tool reduce sum c_forcez   #也可以用压头z方向受到的合力计算载荷
+variable        load2 equal c_m2*(${unit})
+#----------------------------------加载过程-------------------
+dump		    1 all custom 10000 ./output/indentation/Indentation.lammpstrj id type x y z 
+fix		        5 tool move linear 0.0 0.0 -${loadv} units box 
+fix		        6 all print 100 "${disp} ${load1} ${load2}" file ./output/indentation/load_disp.txt
+run		        ${load_step}
+
+#-----------------------------------保持阶段-------------------
+fix		        7 tool move linear 0 0 0 units box
+run		        ${hold_step}
+
+#-----------------------------------卸载过程--------------------
+fix		        7 tool move linear 0.0 0.0 ${loadv} units box 
+run		        ${load_step}
+
+

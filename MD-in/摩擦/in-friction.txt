@@ -1,0 +1,333 @@
+variable  vStep equal step
+variable  vThermoStep equal 1000
+variable  vDumpCustomStep equal 1000
+##--------------------loop Force------------------------
+variable vForce index 0.04336 
+#label   forloopforce
+##--------------------loop Shear------------------------
+variable vShear index 0.01 
+#label   forloopshear
+##--------------------loop Temp------------------------
+variable vTemp index 300
+#label   forlooptemp
+##-------------------------------------------------------
+clear
+units           metal   
+boundary        p p p
+dimension         3
+atom_style      full
+log 		log.friction.txt
+
+neighbor        2.0 bin
+neigh_modify    every 2 delay 10 check yes 
+pair_style	lj/class2 12.5 
+bond_style      class2
+angle_style     class2
+dihedral_style	class2
+improper_style  class2  
+##----------------------------------------------------------------------------------------
+read_data       graPTFE.data extra/atom/types 1
+change_box all boundary p p s remap units box
+variable PTFEzhi equal zhi
+read_data       Fe.data add append offset 7 0 0 0 0   #数字分别为要增加的atom bond angle dihedral improper style
+#change_box all boundary p p s remap units box
+##-----------------------------------------------------------------------------------------
+pair_style      hybrid  eam/fs  lj/class2 12.5
+pair_coeff      * *  eam/fs Fe_mm.eam.fs NULL NULL NULL NULL NULL NULL NULL Fe
+pair_coeff      1 1    lj/class2 0.0026883200   3.8540000000  
+pair_coeff      2 2    lj/class2 0.0029484800   3.9150000000
+pair_coeff      3 3    lj/class2 0.0030352000   3.2000000000
+pair_coeff      4 4    lj/class2 0.0009972800   2.8780000000
+pair_coeff      5 5    lj/class2 0.0008672000   3.8540000000
+pair_coeff      6 6    lj/class2 0.0030352000   3.3000000000
+pair_coeff      7 7    lj/class2 0.0028184000   3.4000000000
+pair_modify     mix arithmetic
+pair_coeff      1 8   lj/class2 0.0402356350	3.2567500000
+pair_coeff      2 8   lj/class2 0.0421375680	3.2872500000
+pair_coeff      3 8   lj/class2 0.0427527480	2.9297500000
+pair_coeff      4 8   lj/class2 0.0245063670	2.7687500000
+pair_coeff      5 8   lj/class2 0.0228523050    3.2567500000
+pair_coeff      6 8   lj/class2 0.0427527480    2.9797500000
+pair_coeff      7 8   lj/class2 0.0411975790    3.0297500000
+write_data      friction.data
+##############################################################
+group Fe  type 8 #定义Fe
+group PTFE subtract all Fe   #定义聚合物（包括石墨烯）
+group Graphene type 1 2 3 4      #定义石墨烯
+group ptfe subtract PTFE Graphene    #定义PTFE
+
+variable PTFEhi equal bound(PTFE,zmax)  #聚合物z轴坐标上限
+variable PTFElo equal bound(PTFE,zmin)  #聚合物z轴坐标下限 
+variable Fehi equal bound(Fe,zmax)      #铁z轴坐标上限
+variable Felo equal bound(Fe,zmin)      #铁z轴坐标下限
+
+variable percPTFEFixhi equal 0.30      
+variable PTFEFixhi equal (${PTFEhi}-${PTFElo})*${percPTFEFixhi}  #定义聚合物的固定层（下）
+variable percPTFETemphi equal 0.37       
+variable PTFETemphi equal (${PTFEhi}-${PTFElo})*${percPTFETemphi} #定义聚合物的恒温层
+variable percFeFixlo equal 0.33        
+variable FeFixlo equal ${Fehi}-(${Fehi}-${Felo})*${percFeFixlo} #定义铁的固定层（上）
+variable percFeTemplo equal 0.44       
+variable FeTemplo equal ${Fehi}-(${Fehi}-${Felo})*${percFeTemplo}  #定义铁的恒温层
+variable percz1 equal 0.53      
+variable z1hi equal (${PTFEhi}-${PTFElo})*${percz1} 
+variable percz2 equal 0.77      
+variable z2hi equal (${PTFEhi}-${PTFElo})*${percz2}
+##------------------Define group---------------------------------------------------
+region FeFix block INF INF INF INF ${FeFixlo} ${Fehi} units box   #铁的固定区域
+group FeFix region FeFix                                             
+region FeTemp block INF INF INF INF ${FeTemplo} ${FeFixlo} units box   #铁的控温区域
+group FeTemp region FeTemp 
+group FeUnfix subtract Fe FeFix  #Fe未固定区
+group Feforce union FeFix FeTemp #铁的固定区域+未固定区域
+group FeAsp subtract Fe Feforce  #铁的牛顿运动区域
+ 
+region PTFEFix block INF INF INF INF ${PTFElo} ${PTFEFixhi} units box   #聚合物的固定区域
+group PTFEFix region PTFEFix  
+region PTFETemp block INF INF INF INF ${PTFEFixhi} ${PTFETemphi} units box   #聚合物的控温区域
+group PTFETemp region PTFETemp  
+
+group PTFEUnfix subtract PTFE PTFEFix  #PTFE未固定区
+group PTFEforce union PTFEFix PTFETemp
+group PTFEAsp subtract PTFE PTFEforce 
+
+group Asp union FeAsp PTFEAsp
+group Fix union FeFix PTFEFix   #FeFix+PTFEFix 固定
+group FeAspPTFE union FeAsp PTFE
+
+region z1 block INF INF INF INF ${PTFEFixhi} ${z1hi} units box     
+group z1 region z1
+region z2 block INF INF INF INF ${z1hi} ${z2hi} units box
+group z2 region z2
+region z3 block INF INF INF INF ${z2hi} ${PTFEhi} units box
+group z3 region z3
+##---------------Minimize-------------------------------------------------
+minimize 2.0e-5 1.0e-3 1000 10000
+reset_timestep 0
+##----------------Initial--------------------------------------------------------
+velocity all create ${vTemp} 5812775 dist gaussian loop geom  #随机速度，温度300K
+velocity Fix set 0.0 0.0 0.0 units box    #初始固定区域速度设置为0 
+
+timestep  0.001    #时间步长1fs 
+thermo  ${vThermoStep}
+##-------------------dimension--------------------------------------------
+variable vDzminPTFE equal bound(PTFE,zmin)
+variable vDzmaxPTFE equal bound(PTFE,zmax)
+variable vDzminFe equal bound(Fe,zmin)
+variable vDzmaxFe equal bound(Fe,zmax)
+variable vDzminAll equal bound(all,zmin)
+variable vDzmaxAll equal bound(all,zmax)
+variable vLenZdAll equal (v_vDzmaxAll-v_vDzminAll)
+variable vLenZdFe equal (v_vDzmaxFe-v_vDzminFe)
+variable vLenZdPTFE equal (v_vDzmaxPTFE-v_vDzminPTFE)
+
+fix Height all ave/time 1 1 1000 v_vLenZdAll v_vLenZdFe v_vLenZdPTFE ave one file output_Height_PushForce${vForce}_Shear${vShear}_Temp${vTemp}   #输出高度值
+##------------------stress/atom--------------------------------------------应力计算
+compute       sFeFix FeFix stress/atom NULL virial  #铁固定区域内的单个原子的应力，维里应力                     
+compute       strea FeFix reduce sum c_sFeFix[1]    #铁固定区域内的全部原子的应力和，X方向
+compute       streb FeFix reduce sum c_sFeFix[2]    #铁固定区域内的全部原子的应力和，Y方向
+compute       strec FeFix reduce sum c_sFeFix[3]    #铁固定区域内的全部原子的应力和，Z方向
+variable      sxx equal -c_strea/(11.79*count(FeFix))*(10^-4)   #铁固定区域内的全部原子的应力和除以该区域体积，X方向
+variable      syy equal -c_streb/(11.79*count(FeFix))*(10^-4)   #铁固定区域内的全部原子的应力和除以该区域体积，Y方向
+variable      szz equal -c_strec/(11.79*count(FeFix))*(10^-4)   #铁固定区域内的全部原子的应力和除以该区域体积，Z方向
+
+fix force1 FeFix ave/time 1 1 1000 v_sxx v_syy v_szz ave one file output_forceFeFix_PushForce${vForce}_Shear${vShear}_Temp${vTemp}  #输出各个方向的应力值
+##------------------Temp--------------------------------------------------------------------------------------------
+compute cFeUnfix FeUnfix temp/profile 1 1 1 xyz 1 1 1  #铁未固定区域的温度计算
+compute cPTFEUnfix PTFEUnfix temp/profile 1 1 1 xyz 1 1 1   #聚合物未固定区域的温度计算
+
+compute cFeTemp FeTemp temp/profile 1 1 1 xyz 1 1 1  #铁控温区域的温度计算
+compute cPTFETemp PTFETemp temp/profile 1 1 1 xyz 1 1 1  #聚合物控温区域的温度计算
+
+compute cFeAsp FeAsp temp/profile 1 1 1 xyz 1 1 1     #铁牛顿区域的温度计算
+compute cPTFEAsp PTFEAsp temp/profile 1 1 1 xyz 1 1 1   #聚合物牛顿区域的温度计算
+compute cz3 z3 temp/profile 1 1 1 xyz 1 1 1    
+
+
+compute cc1 all chunk/atom bin/1d z lower 0.02 units reduced  #整个模型Z方向的温度分布
+compute myChunk all temp/chunk cc1 temp
+
+compute cc2 PTFE chunk/atom bin/1d z lower 0.01 units reduced   #聚合物Z方向的温度分布
+compute myChunk2 PTFE temp/chunk cc2 temp
+
+fix temp2 all ave/time 1 1 1000 c_cFeAsp c_cPTFEAsp c_cz3 ave one file output_Temp_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+fix temp all ave/chunk 100 10 1000 cc1 temp file output_TempAll_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+fix temp3 PTFE ave/chunk 100 10 1000 cc2 temp file output_TempPTFE_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+##------------------group/group--------------------------------------------------------------------------------------
+compute cFePTFE Fe group/group PTFE    #Fe与PTFE之间的相互作用
+compute cGrapheneptfe ptfe group/group Graphene    #PTFE与石墨烯之间的相互作用
+fix groupforce all ave/time 1 1 1000 c_cFePTFE ave one file output_groupforce_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+fix groupforce2 PTFE ave/time 1 1 1000 c_cGrapheneptfe ave one file output_groupforce2_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+
+compute cPTFEpe PTFE pe/atom   #PTFE原子的势能
+compute czPTFEpe PTFE reduce sum c_cPTFEpe
+
+compute cPTFEke PTFE ke/atom   #PTFE原子的动能
+compute czPTFEke PTFE reduce sum c_cPTFEke
+
+fix peke PTFE ave/time 1 1 1000 c_czPTFEpe c_czPTFEke ave one file output_peke_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+
+##------------------energy------------------------------------------------------------------------------------------------									 
+										
+variable etotal equal etotal   #计算总能量、非键能、范德华、键、角、二面角能和库仑力
+variable epair equal epair
+variable evdwl equal evdwl
+variable ebond equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+#variable ecoul equal ecoul
+
+fix energy PTFE ave/time 1 1 1000 v_etotal v_epair v_evdwl v_ebond v_eangle v_edihed file output_energy_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+##--------------------mass----------------------------------------------------------------------------------------
+compute massdensity all chunk/atom bin/1d z lower 0.01 units reduced   #沿Z方向的质量密度分布
+fix profile2 all ave/chunk 100 10 1000 massdensity density/mass file output_massdensity_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+#-------------------gr------------------------------------------------------------------------------------------------   
+compute RDF all rdf 20 8 5 8 6 8 7 #聚合物与铁的RDF
+fix GR all ave/time 1 1 1000 c_RDF[1] c_RDF[2] c_RDF[3] file output_rdf_PushForce${vForce}_Shear${vShear}_Temp${vTemp} mode vector
+
+#compute RDF2 all rdf 20 2 4 2 5  #石墨烯中C原子与PTFE中C原子之间的RDF
+#fix GR2 all ave/time 1 1 1000 c_RDF2[1] c_RDF2[2] c_RDF2[3] file output_rdf2_PushForce${vForce}_Shear${vShear}_Temp${vTemp} mode vector
+
+compute RDF3 all rdf 20 1 5 1 6 1 7    #石墨烯中H原子与PTFE中C原子之间的RDF
+fix GR3 all ave/time 1 1 1000 c_RDF3[1] c_RDF3[2] c_RDF3[3] file output_rdf3_PushForce${vForce}_Shear${vShear}_Temp${vTemp} mode vector
+#--------------------MSD---------------------------           
+compute MSD PTFEUnfix msd   #未固定PTFE中分子的MSD
+fix myMSD PTFEUnfix ave/time 1 1 1000 c_MSD[1] c_MSD[2]  c_MSD[3]  c_MSD[4] file output_MSD_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+
+compute MSD_1 z1 msd
+fix myMSD_1 z1 ave/time 1 1 1000 c_MSD_1[1] c_MSD_1[2]  c_MSD_1[3]  c_MSD_1[4] file output_MSD1_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+compute MSD_2 z2 msd
+fix myMSD_2 z2 ave/time 1 1 1000 c_MSD_2[1] c_MSD_2[2]  c_MSD_2[3]  c_MSD_2[4] file output_MSD2_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+compute MSD_3 z3 msd
+fix myMSD_3 z3 ave/time 1 1 1000 c_MSD_3[1] c_MSD_3[2]  c_MSD_3[3]  c_MSD_3[4] file output_MSD3_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+##--------------------dump----------------------------------------------------------------------
+thermo  ${vThermoStep}
+write_restart 	restart.PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump D all custom ${vDumpCustomStep} output_DumpAllCustom.PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpsstrjD id mass type xs ys zs element  
+dump_modify D element C C F H C F F Fe
+##--------------------------------------------------
+###################### relax ###########################第一阶段，平衡过程
+fix 1 FeFix setforce  0.0 0.0 0.0
+fix 2 PTFEFix setforce  0.0 0.0 0.0 
+
+fix 3 Fix nve  
+
+fix 4 FeUnfix nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 4 temp cFeUnfix
+
+fix 5 PTFEUnfix nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 5 temp cPTFEUnfix
+
+run 800000
+
+write_data      relax_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.data
+write_restart 	restart.relax_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump R all custom ${vDumpCustomStep} output_DumpAllCustom.relax_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpsstrjD id mass type xs ys zs element    
+dump_modify R element C C F H C F F Fe
+######################### push limit ###################### 第二阶段，加载过程
+unfix 1                                        
+unfix 2
+unfix 3
+unfix 4
+unfix 5										 
+#########################
+fix 1 FeFix setforce  0.0 0.0 NULL
+fix 2 PTFEFix setforce  0.0 0.0 0.0 
+fix 3 FeFix aveforce  NULL NULL -${vForce}
+
+fix 4 Fix nve/limit 0.00025  
+
+fix 5 FeTemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 5 temp cFeTemp
+
+fix 6 PTFETemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 6 temp cPTFETemp
+
+
+fix 7 Asp nve
+
+run 500000
+
+write_data      pushlimit_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.data									 
+write_restart 	restart.pushlimit_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump L all custom ${vDumpCustomStep} output_DumpAllCustom.pushlimit_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpsstrjD id mass type xs ys zs element
+dump_modify L element C C F H C F F Fe
+######################### push ###################### 第二阶段，加载过程（平衡）
+unfix 1                                        
+unfix 2
+unfix 3
+unfix 4
+unfix 5
+unfix 6
+unfix 7										 
+#########################
+fix 1 FeFix setforce  0.0 0.0 NULL
+fix 2 PTFEFix setforce  0.0 0.0 0.0 
+fix 3 FeFix aveforce  NULL NULL -${vForce}
+
+fix 4 Fix nve  
+
+fix 5 FeTemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 5 temp cFeTemp
+
+fix 6 PTFETemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 6 temp cPTFETemp
+
+
+fix 7 Asp nve
+
+run 500000
+
+write_data      push_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.data									 
+write_restart 	restart.push_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump P all custom ${vDumpCustomStep} output_DumpAllCustom.push_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpsstrjD id mass type xs ys zs element						 
+dump_modify P element C C F H C F F Fe
+######################### shear #############################第三阶段，滑动过程										 
+unfix 1                                        
+unfix 2
+unfix 3
+unfix 4
+unfix 5											 
+unfix 6
+unfix 7
+	
+fix 1 PTFEFix setforce  0.0 0.0 0.0 
+fix 2 FeFix aveforce  NULL NULL -${vForce}
+
+fix 3 FeFix move linear ${vShear} 0.0 NULL units box  
+
+
+fix 4 FeTemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 4 temp cFeTemp
+
+fix 5 PTFETemp nvt temp ${vTemp} ${vTemp} 0.1
+fix_modify 5 temp cPTFETemp
+
+fix 6 Asp nve
+
+run 4000000
+
+write_data      shear_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.data									 
+write_restart 	restart.shear_PushForce${vForce}_Shear${vShear}_Temp${vTemp}
+dump S all custom ${vDumpCustomStep} output_DumpAllCustom.shear_PushForce${vForce}_Shear${vShear}_Temp${vTemp}.lammpsstrjD id mass type xs ys zs element						 
+dump_modify S element C C F H C F F Fe
+################################################################	 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+

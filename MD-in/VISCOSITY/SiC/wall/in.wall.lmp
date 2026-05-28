@@ -1,0 +1,115 @@
+# sample LAMMPS input script for viscosity of 2d LJ liquid
+# use shearing wall, thermostat via fix langevin
+
+# settings
+variable fname index SiC.data
+variable vFixpercent equal 0.1  #夹具的长度占总长的比值
+variable vEqu1time equal 2000         #500000
+variable vEqu2time equal 5000         #500000
+# problem setup
+##############----------------loop Temperature
+label loopTem
+variable vTemp index 2500 #2500 #温度
+##############----------------loop Velocity
+label loopVel
+variable vSrate index 2.7 #3.7 # 速度的单位A/fs
+##############----------------
+shell mkdir ${vTemp}_${vSrate}
+shell cd ${vTemp}_${vSrate}
+##############----------------Initial----------------
+log ${vTemp}K_${vSrate}.log
+clear
+units           metal
+boundary        p p p
+atom_style      charge
+#processors      * * 1 
+read_data ../${fname}
+mass            1 12.011000  # boron mass (g/mole) | membrane
+mass            2 28.085500   # nitrogen mass (g/mole) | adsorbate
+######################## Potential defition ########################
+pair_style  tersoff shift 0.05
+pair_coeff  * * ../SiC.tersoff C Si
+####################################################################
+# Neighbor update settings
+neighbor        2.0 bin
+neigh_modify    every 1
+neigh_modify    delay 0
+neigh_modify    check yes
+#### Simulation settings ####
+timestep        0.001
+#########################
+variable vDyhi equal bound(all,ymax) #yhi
+variable vDylo equal bound(all,ymin) #ylo
+variable vDyle equal ${vDyhi}-${vDylo}
+variable vDfle equal ${vDyle}*${vFixpercent}
+variable vymax equal ${vDyhi}-${vDfle}
+variable vymin equal ${vDylo}+${vDfle}
+variable vDMle equal ${vymax}-${vymin}
+region Low block INF INF INF ${vymin} INF INF units box
+region Top block INF INF ${vymax} INF INF INF units box
+group Low region Low 
+group Top region Top
+group Wall union Low Top 
+group Flow subtract all Wall
+##############----------------MM----------------
+#min_style cg                                       #qwh
+#min_modify dmax 0.4
+minimize 1e-10 1e-10 20000 50000    
+##############-
+velocity    Flow create ${vTemp} 97287
+# 流动层根据温度设定
+velocity	Top set ${vSrate} 0.0 0.0 units box
+# 上层为剪切速度，底层没有设定速度
+compute		thermal Flow temp/partial 0 1 0
+# 排除y方向速度
+compute		Flow Flow temp
+# 计算流动层实际温度
+fix         1 all nve
+fix	        2 Flow langevin ${vTemp} ${vTemp} 1 498094 
+fix_modify  2 temp thermal
+# 温度校正
+fix		    3 Wall setforce 0.0 0.0 0.0
+# 设定wall层的力为0，上层速度为2.7，下层速度为0
+compute     layers all chunk/atom bin/1d y center 0.05 units reduced
+#compute     layers flow chunk/atom bin/1d y center 0.05 units reduced
+# 结果一样，都是对整个模型进行分割，
+#compute     layers all chunk/atom bin/1d y lower 0.05 units reduced
+#fix		    4 all ave/chunk 20 500 10000 layers vx file profile.wall.2d
+fix	        4 all ave/chunk 20 500 10000 layers vx file profile_low.wall.2d
+#fix		    4 flow ave/chunk 20 500 10000 layers vx file profile.flow.wall.2d
+# 10000 保存一次，y方向分成20层，center,lower的设定对结果没有影响
+#fix	        5 all enforce2d
+# equilibration run
+#variable    ybox equal $y*ylat
+compute		tilt Flow temp/ramp vx 0 ${vSrate} y 0 ${vDMle} units box
+#一种计算，在计算动能之前，在减去斜坡速度剖面后，计算一组原子的温度。目的为了后续模拟调节体系温度。
+thermo      1000
+thermo_style	custom step temp c_tilt epair etotal press pxy ylat v_vDMle
+#run	        20000
+run	        ${vEqu1time} 
+# data gathering run
+variable	visc equal -pxy/(v_vSrate/ly)
+#variable	visc equal -pxy/(v_srate/v_ybox)
+fix		    vave all ave/time 1000 1 1000 v_visc ave running
+#fix		    vave flow ave/time 1000 1 1000 v_visc ave running
+thermo_style	custom step temp pxy v_visc f_vave ly
+thermo_modify	temp tilt
+# only need to run for 5000 steps to make a good 100-frame movie
+dump	        1 all custom 1000 dump.wall.${vTemp}_${vSrate}.lammpstrj id mass type x y z vx vy vz xs ys zs element 
+dump_modify     1 element C Si
+#dump_modify	2 pad 5 amap 0.0 ${srate} ca 0.0 2 min blue max red
+#run		500000
+run	        ${vEqu2time}
+unfix 1
+unfix 2
+unfix 3
+unfix 4
+unfix vave
+undump 1
+#####################################################
+shell cd ../
+next vSrate
+jump in.wall.lmp loopVel
+next vTemp
+jump in.wall.lmp loopTem
+print "All done"

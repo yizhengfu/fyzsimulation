@@ -1,0 +1,97 @@
+############################################################################
+################################# Deform method ##########################
+############################################################################
+
+#------------------------------Model settings--------------------------
+clear
+shell               mkdir output ./output/minimize ./output/relax ./output/shear ./output/data
+
+#------------------------------Basic settings--------------------------
+units               metal
+dimension           3  
+boundary            p p p        
+atom_style          atomic
+
+variable            Temp equal 300          	# desired temperature
+variable            tstp equal 0.001            # timestep
+variable            tdamp equal 100*${tstp}     # damping parameters # 
+variable            pdamp equal 1000*${tstp}    # for NPT ensemble   #
+variable            dump_every equal 1000       
+variable            equi_step equal 10000
+
+read_data           Ni_supercell.lmp
+
+#----------------------------------------- Force Field ------------------------------------
+pair_style          eam             
+pair_coeff          * * Ni_u3.eam
+
+#--------------------------------------------- Minimization ---------------------------------------
+thermo              100
+timestep            ${tstp}
+thermo_style        custom step temp etotal pe ke pxy
+
+# compute specific quantities
+compute             pot_energy all pe/atom
+dump                min all custom ${dump_every} ./output/minimize/dump_minimize.*.lammpstrj id type x y z c_pot_energy 
+
+min_style           cg
+minimize            1.0e-6 1.0e-6 10000 10000
+
+write_data          ./output/minimize/mini.data
+
+#------------------------------------------ equilibrium -------------------------------
+undump              min
+reset_timestep      0
+
+compute             new3d all temp
+compute             new2d all temp/partial 0 1 1
+
+velocity            all create ${Temp} 12345 units box
+fix				    1 all npt temp ${Temp} ${Temp} ${tdamp} iso 0.0 0.0 ${pdamp}
+fix_modify          1 temp new3d
+
+thermo              1000
+thermo_modify       temp new3d
+run                 ${equi_step} 
+
+write_data          ./output/relax/equil.data
+write_restart       ./output/relax/equil.restart
+
+#------------------------------------------- shear in xy plane -------------------------------------
+reset_timestep      0
+unfix               1
+
+change_box          all triclinic
+
+variable            tmpx equal lx
+variable            tmpy equal ly
+variable            tmpz equal lz
+variable            L0x equal ${tmpx}
+variable            L0y equal ${tmpy}
+variable            L0z equal ${tmpz}
+
+# In units metal, pressure is in [bars]; sxz is in GPa
+
+variable            srate equal 0.01           
+variable            final_strain equal 0.4
+variable            dyna_step equal ${final_strain}/(${srate}*${tstp})
+
+variable            sxy equal "-pxy/10000"          # calculate shear stress
+variable            strain equal ${srate}*step*${tstp}        # calculate shear strain
+
+# deformation starts!
+#fix				    1 all nve
+#fix                 2 all temp/rescale 1 ${Temp} ${Temp} ${tdamp} 0.5
+fix				2 all npt temp ${Temp} ${Temp} ${tdamp} iso 0.0 0.0 ${pdamp}
+fix_modify          2 temp new2d
+
+fix                 3 all deform 1 xy erate ${srate} remap x
+
+dump                result all custom ${dump_every} ./output/shear/dump.*.lammps id type x y z
+fix                 def1 all print 100 "${strain} ${sxy}" file ./output/data/Shear_data.txt screen no
+thermo_style 	    custom step press pe pxx pyy pzz pxy pxz pyz v_strain v_sxy
+run                 ${dyna_step}
+write_data          ./output/shear/shear_end.*.data
+write_restart       ./output/shear/shear_end.*.restart
+
+print "-------------------------------- All done! -----------------------------------------"

@@ -1,0 +1,78 @@
+#fyz-2022-6-11-1
+variable fDGEBA      index DGE       #环氧文件结构的文件名，不包含后缀，且后缀为“data”
+variable fGraphene   index Gra       #石墨烯文件结构的文件名，不包含后缀，且后缀为“data”
+variable fBullet     index Bullet    #弹丸文件结构的文件名，不包含后缀，且后缀为“data”
+variable vThermostep equal 1
+variable vFrestep    equal  10       #Dump1步长
+variable vEqustep1   equal  10       #平衡NVE时间
+variable vEqustep2   equal  10       #平衡NVT时间
+#===========================loop Temperature===========================
+label    loopTem
+variable vTemp index 300
+#===========================l
+shell mkdir ${vTemp}K
+shell cd ${vTemp}K
+#=========================== 模拟基本参数 ==============================
+clear
+log log.impactequ.txt
+units real
+boundary p p p 
+dimension 3 
+atom_style charge
+#neighbor       2 nsq
+#neigh_modify   every 1 delay 5  check yes
+neighbor        2.5 bin
+neigh_modify    every 10 delay 0 check no
+#===============    读取模型文件并分组(合并环氧和石墨烯) ================
+read_data       ../${fDGEBA}.data group DGEBA extra/atom/types 2 
+read_data       ../${fGraphene}.data group Graphene add append offset 5 0 0 0 0 shift 1 0 0#根据情况修改 
+read_data       ../${fBullet}.data group Bullet add append offset 6 0 0 0 0 shift 0 -3 0 
+#===========================  势函数设置 ================================
+pair_style 		reax/c  NULL                #reax/c为反应势类型说明，lmp_control为输出控制文件，如果不需要对输出进行控制，可设置为NULL
+pair_coeff 		* * ../field.reax-chons  C S O N H C C
+fix   			q all qeq/reax 1 0.0 10.0 1e-6 reax/c        #电荷平衡
+write_data      all.data 
+group           Slab union DGEBA Graphene
+#group           Slab  type 1 2 3 4 5 6
+#=========================== 能量最小化 ============================
+timestep        0.1               #0.1fs 
+velocity        Bullet set 0.0 0.0 0.0 units box          #设弹丸初始化速度为0
+fix             fSetBullet Bullet setforce  0.0 0.0 0.0   #设置弹丸受到的压力为0，防止弹丸变形
+min_style       cg                                        #最陡下降算法  qwh
+min_modify      dmax 0.4
+minimize        1e-10 1e-10 20000 50000                    #能量最小化
+reset_timestep  0
+#=========================== 初始化 ============================
+velocity         Slab create ${vTemp} 5812775 dist gaussian loop geom   #设置层模型得随机速度，温度300K
+thermo           100                                                    #每隔10步在屏幕上输出模拟信息,输出体系信息
+thermo_style     custom  step pe ke etotal temp lx ly lz press atoms vol
+compute          cTSlab  Slab temp
+thermo_modify    temp    cTSlab flush yes lost ignore 
+fix              bonds all reax/c/bonds 10 bonds.reax                   #qwh 小程序所需文件
+#=========================== 平衡 ============================
+dump 			 1 all custom ${vFrestep} all_${vTemp}.lammpstrj id type xs ys zs ix iy iz element mass	  #轨迹文件输出		 
+dump_modify 	 1 sort id element C S O N H C C
+dump 			 2 Graphene custom ${vFrestep} gra_${vTemp}.lammpstrj id type xs ys zs ix iy iz element mass					 
+dump_modify 	 2 sort id element C S O N H C C
+dump 			 3 Bullet custom ${vFrestep} Bullet_${vTemp}.lammpstrj id type xs ys zs ix iy iz element mass					 
+dump_modify 	 3 sort id element C S O N H C C
+#--------------------------------------------------------------
+fix              1 all  nve/limit 0.1                                   #nve
+run ${vEqustep1}
+write_data       All_${vTemp}EquNVE.data									 
+write_restart    All_${vTemp}EquNVE.restar
+unfix            1
+#---------------------------------------------------------------
+fix              1 all nve                                              #nvt，并用langevin控温
+fix	             2 all langevin ${vTemp} ${vTemp} ${vFrestep} 90429997   
+fix_modify       2 temp cTSlab
+run ${vEqustep2} 
+write_data       All${vTemp}K.EquNVT.data     							 
+write_restart 	 All${vTemp}K.EquNVT.restart
+unfix 1
+unfix 2
+unfix fSetBullet
+shell cd ../
+next vTemp
+jump in.impequ.txt loopTem
+print "All done"
