@@ -1,9 +1,0 @@
-#!/bin/bash
-#SBATCH --partition=snode
-#SBATCH -N 1
-#SBATCH -n 48
-#SBATCH -o %j.out
-#SBATCH -e %j.err
-module load ms
-inputfile=Cu  根据您计算的内容进行相应的修改
-RunCASTEP.sh -np $SLURM_NTASKS $inputfile &> output.log 2>&1

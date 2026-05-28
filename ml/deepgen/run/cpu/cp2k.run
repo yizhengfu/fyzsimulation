@@ -1,8 +1,0 @@
-#!/bin/bash
-#SBATCH --partition=sm
-#SBATCH -N 1
-#SBATCH -n 20
-#SBATCH -o %j.out
-#SBATCH -e %j.err
-module load  mkl cp2k/2024.3/cpu
-mpirun -np 20 cp2k.popt -i input_file.inp -o output_file.out

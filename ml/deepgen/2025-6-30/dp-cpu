@@ -1,9 +1,0 @@
-#!/bin/bash
-#SBATCH --partition=snode
-#SBATCH -N 1
-#SBATCH -n 48
-#SBATCH -o %j.out
-#SBATCH -e %j.err
-
-module load dp-cpu
-dp train XXX

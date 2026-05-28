@@ -1,8 +1,0 @@
-#!/bin/bash
-#SBATCH --partition=sm
-#SBATCH -N 1
-#SBATCH -n 48
-#SBATCH -o %j.out
-#SBATCH -e %j.err
-module load oneapi/2021 lammps/deepmd-cpu
-mpirun -np 48 lmp_mpi  -in in.PMMAdecom.txt

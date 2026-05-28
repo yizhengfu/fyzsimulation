@@ -1,9 +1,0 @@
-#!/bin/bash
-#SBATCH --partition=debug
-#SBATCH -N 1
-#SBATCH -n 20
-#SBATCH -o %j.out
-#SBATCH -e %j.err
-module load ms/2020
-inputfile=Cu  
-RunCASTEP.sh -np 20 $inputfile &> output.log 2>&1

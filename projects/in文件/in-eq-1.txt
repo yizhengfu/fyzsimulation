@@ -1,0 +1,225 @@
+# fyz-2022-6-11VARIABLES 体系平衡脚本，分为四步。
+#第一步500ps 高温600K的NVT；第二步500ps 高温600K的NPT；
+#第三步退火，首先在低温300K进行20ps的NPT，然后升高到600K 温度间隔为（600-300）/6
+#最后再降温到300K的 ${vAnncyc}个循环。
+#第四步500ps的NVT和500ps的NPT模拟
+variable fname     index su8pcff_cross    #文本
+variable vTemp     equal 300            #低温温度
+variable vTemhi    equal 600            #高温温度
+variable vAnnramp  equal 6 #6           #退火温度间隔
+variable vDt equal (${vTemhi}-${vTemp})/${vAnnramp}
+variable vAnncyc   equal 5 #5           #退火循环次数
+variable vPre      equal 1              #常压1atm=0.101Mpa
+variable vEqu1time equal 500000         #500000
+variable vEqu2time equal 500000         #500000
+variable vEqu3time equal 20000          #20000
+variable vEqu4time equal 500000         #500000
+variable vFrestep  equal 1000           #一般不修改 每隔1000步保存1次
+variable vNrepeat  equal ${vEqu4time}/${vFrestep}  #一般不修改
+variable vdt       equal 1            #时间步长
+##############----------------
+shell mkdir ${vTemp}K
+shell cd ${vTemp}K
+##############----------------Initial----------------
+log ${vTemp}K.log
+clear
+units real
+boundary p p p
+dimension 3 
+atom_style full
+##############----------------Forcefield 
+bond_style class2
+angle_style class2   
+dihedral_style class2   
+improper_style class2  
+#pair_style lj/class2/coul/cut 12.5 12.5
+pair_style lj/class2/coul/long 12.5
+pair_modify             shift yes mix arithmetic
+special_bonds           lj/coul 0.0 0.0 0.5
+kspace_style ewald 1.0e-4   
+read_data ../${fname}.data
+#read_restart   restart.${simname}.pcff4
+##############----------------Neighbour
+neighbor 0.3 bin   # neighbor 0.2 bin
+neigh_modify every 1 delay 10 check yes
+##############----------------MM----------------
+#min_style cg                                       #qwh
+#min_modify dmax 0.4
+minimize 1e-10 1e-10 20000 50000                    #能量最小化
+##############----------------Temper controllers
+compute cTall all temp
+#compute cPress all pressure thermo_temp
+compute cPress all pressure cTall
+compute cEng all pe/atom                            #compute potential energy for each atom
+compute cEatoms all reduce sum c_cEng               #compute total energy for whole system
+##############----------------Thermo
+timestep 1
+thermo_style custom step temp press pe ke etotal lx ly lz atoms vol c_cEatoms 
+thermo_modify temp cTall flush yes lost ignore lost/bond ignore
+thermo 1000
+reset_timestep 0
+#####################################################
+# initial velocities
+velocity all create ${vTemhi} 5812775 dist gaussian loop geom
+#####################################################
+# Equilibration Stage 1 (NVT dynamics at 600K)
+##############----------------NVT
+#fix 1 all nvt temp ${vTemhi} ${vTemhi} $(100.0*dt) #drag 2
+fix 1 all nve/limit 0.1 
+fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+fix_modify 2 temp cTall
+run ${vEqu1time}
+unfix 1
+unfix 2
+write_data ${fname}${vTemp}K.Equ1.data
+write_restart ${fname}${vTemp}K.Equ1.restart
+minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+#####################################################
+# Equilibration Stage 2 (NPT dynamics at 600K)
+##############----------------NPT
+velocity all create ${vTemhi} 5812775 dist gaussian loop geom
+fix 1 all npt temp ${vTemhi} ${vTemhi} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix_modify 1 temp cTall press cPress
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+#fix_modify 2 temp cTall
+#fix_modify 3 press cPress
+run ${vEqu2time}
+unfix 1
+#unfix 2
+#unfix 3
+write_data ${fname}${vTemp}K.Equ2.data
+write_restart ${fname}${vTemp}K.Equ2.restart
+minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+#####################################################
+# Equilibration Stage 3 (NPT dynamics at 600K-100K)
+##############----------------NPT
+fix 1 all npt temp ${vTemhi} ${vTemp} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix_modify 1 temp cTall press cPress
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vTemhi} ${vTemp} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+#fix_modify 2 temp cTall
+#fix_modify 3 press cPress
+run ${vEqu3time}
+unfix 1
+#unfix 2
+#unfix 3
+minimize 1e-10 1e-10 200000 500000 
+label loopc
+variable k loop  ${vAnncyc}
+label loopa
+variable i loop ${vAnnramp}
+variable vAnnTempin equal ${vTemp}+$i*${vDt}
+fix 1 all npt temp ${vAnnTempin} ${vAnnTempin} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix_modify 1 temp cTall press cPress
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vAnnTempin} ${vAnnTempin} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+#fix_modify 2 temp cTall
+#fix_modify 3 press cPress
+run ${vEqu3time}
+unfix 1
+#unfix 2
+#unfix 3
+minimize 1e-10 1e-10 200000 500000 
+next i
+jump ../in-eq.txt loopa
+label loopb
+variable j loop  ${vAnnramp}
+variable vAnnTempde equal ${vTemhi}-$j*${vDt}
+fix 1 all npt temp ${vAnnTempde} ${vAnnTempde} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix_modify 1 temp cTall press cPress
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vAnnTempde} ${vAnnTempde} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+#fix_modify 2 temp cTall
+#fix_modify 3 press cPress
+run ${vEqu3time}
+unfix 1
+#unfix 2
+#unfix 3
+minimize 1e-10 1e-10 200000 500000 
+next j
+jump ../in-eq.txt loopb
+next k
+jump SELF loopc
+write_data ${fname}${vTemp}K.Equ3.data
+write_restart ${fname}${vTemp}K.Equ3.restart
+#####################################################
+# Equilibration Stage 4 (NVT dynamics at 300K)
+reset_timestep 0
+##############----------------NVT
+#fix 1 all nvt temp ${vTemp} ${vTemp} $(100.0*dt) #drag 2
+fix 1 all nve/limit 0.1 
+fix 2 all temp/berendsen ${vTemhi} ${vTemhi} $(100.0*dt)
+fix_modify 2 temp cTall
+run ${vEqu4time}
+unfix 1
+unfix 2
+minimize 1e-10 1e-10 200000 500000 
+reset_timestep 0
+write_data ${fname}${vTemp}K.Equ4NVT.data
+write_restart ${fname}${vTemp}K.Equ4NVT.restart
+##############----------------Dump----------------##############
+dump 1 all custom ${vFrestep} ${fname}${vTemp}K.lammpstrj id mass type x y z vx vy vz xs ys zs element
+dump_modify 1 sort id element O C C C H C C C O H O
+##############----------------CED
+variable vNatoms equal count(all)                       ## set variable "natoms" to count number of atoms in system
+variable vTeng equal c_cEatoms                          ## set variable "teng" to store total energy of whole system
+variable vEcoh equal v_vTeng/v_vNatoms                  ## define cohesive energy as total energy divided by total atom number
+variable vDen  equal density
+variable vVol  equal vol
+variable vCED  equal v_vEcoh*6953/v_vVol
+variable vSP   equal (-v_vCED)^0.5
+fix CED all ave/time 10 10 1000 v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K_NVTCED.txt 
+fix CEDave all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} v_vNatoms v_vDen v_vVol v_vTeng v_vEcoh v_vCED v_vSP file ${fname}${vTemp}K_CEDave.txt
+##############----------------Energy
+variable etotal equal etotal  
+variable epair  equal epair
+variable evdwl  equal evdwl
+variable ecoul  equal ecoul
+variable ebond  equal ebond
+variable eangle equal eangle 
+variable edihed equal edihed
+variable eimp   equal eimp
+variable emol   equal emol
+variable elong  equal elong 
+variable etail  equal etail
+variable enthalpy  equal enthalpy 
+#fix energy all ave/time 10 10 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K_Energy.txt
+fix energy all ave/time 1 1 ${vFrestep} v_etotal v_epair v_evdwl v_ecoul v_ebond v_eangle v_edihed  v_eimp v_emol v_elong v_etail v_enthalpy file ${fname}${vTemp}K_NVTEnergy.txt
+##############----------------MSD       
+compute cMSDall all msd com yes 
+variable vtwopointall equal c_cMSDall[4]/6/(step*dt+1.0e-6) 
+fix MSD all vector 1000 c_cMSDall[4]
+variable vfitslopeall equal slope(f_MSD)/6/(1000*dt)
+fix 52 all ave/time 1 1 1000 c_cMSDall[1] c_cMSDall[2] c_cMSDall[3] c_cMSDall[4] v_vtwopointall v_vfitslopeall file ${fname}${vTemp}K_MSD.txt
+##############----------------RG
+compute RG all gyration                         #计算polymer的均方回转半径
+fix 61 all ave/time 10 10 1000 c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K_NVTRG.txt #每100个间隔取一个值，10个值求一次平均，每1000步输出一个值
+fix 62 all ave/time ${vFrestep} ${vNrepeat} ${vEqu4time} c_RG[1] c_RG[2] c_RG[3] c_RG[4] c_RG[5] c_RG[6] file ${fname}${vTemp}K_RGave.txt    #（XX,YY,ZZ,XY,YZ,XZ）
+
+##############----------------NPT
+fix 1 all npt temp ${vTemp} ${vTemp} $(100.0*dt) iso ${vPre} ${vPre} $(1000.0*dt) #drag 2
+#fix_modify 1 temp cTall
+#fix_modify 1 temp cTall press cPress
+#fix 1 all nve/limit 0.1 #0.1
+#fix 2 all temp/berendsen ${vTemhi} ${vTemp} $(100.0*dt)
+#fix 3 all press/berendsen iso ${vPre} ${vPre} $(1000.0*dt)
+#fix_modify 2 temp cTall
+#fix_modify 3 press cPress
+run ${vEqu4time}
+unfix 1
+#unfix 2
+#unfix 3
+write_data ${fname}${vTemp}K.Equ4NPT.data
+write_restart ${fname}${vTemp}K.Equ4NPT.restart
+print "All done"
